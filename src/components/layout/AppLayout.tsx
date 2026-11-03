@@ -32,10 +32,7 @@ export function AppLayout() {
       <div className="p-20 text-center">
         <h2>No se pudieron cargar los datos</h2>
         <p>{loadError}</p>
-        <p>
-          Verifica que el servidor esté activo y que el almacenamiento del navegador esté
-          habilitado.
-        </p>
+        <p>Verifica que el servidor esté activo e inténtalo de nuevo.</p>
         <Button onClick={() => void load()}>Reintentar</Button>
       </div>
     )
