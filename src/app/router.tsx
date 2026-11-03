@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router'
 import { AppLayout } from '@/components/layout'
-import { LoginPage } from '@/features/auth'
+import { LoginPage, RegisterPage } from '@/features/auth'
 import { GuestOnly, RequireAuth } from './guards'
 import { ROUTES } from './navigation'
 
@@ -11,6 +11,14 @@ export const router = createBrowserRouter([
     element: (
       <GuestOnly>
         <LoginPage />
+      </GuestOnly>
+    ),
+  },
+  {
+    path: ROUTES.register,
+    element: (
+      <GuestOnly>
+        <RegisterPage />
       </GuestOnly>
     ),
   },

@@ -23,6 +23,6 @@ export const moveStock: CommandHandler<'stock/move'> = (draft, p) => {
     ingredient: ingredient.name,
     quantity: delta,
     unit: ingredient.unit,
-    note: requireText(p.note, 'El motivo'),
+    note: requireText(p.note, 'El motivo', 3),
   })
 }
