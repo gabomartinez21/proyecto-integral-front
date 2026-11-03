@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { applyCommand, createInitialState, type KitchenCommand, type KitchenState } from '@/domain'
 import { errorMessage } from '@/lib/errors'
 import { kitchenRepository } from '@/services/storage'
+import { apiInsumosService } from '@/services/storage/api-insumos'
+import { apiPedidosService } from '@/services/storage/api-pedidos'
 import { useAuthStore } from './auth.store'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -13,7 +15,6 @@ interface KitchenStore {
   revision: number
   busy: boolean
   load: () => Promise<void>
-  /** Ejecuta un comando de dominio y lo persiste. Lanza un error si falla. */
   dispatch: (command: KitchenCommand) => Promise<void>
 }
 
@@ -29,6 +30,20 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
     set({ status: 'loading', loadError: null })
     try {
       const { data, revision } = await kitchenRepository.read()
+      
+      try {
+        const insumosBD = await apiInsumosService.fetchInsumos();
+        const pedidosBD = await apiPedidosService.fetchPedidos();
+        
+        data.ingredients = insumosBD.map((i: any) => ({
+          id: String(i.id), name: i.name, unit: i.unit, stock: i.stock, minimum: i.minimum, cost: i.cost
+        }));
+        
+        data.orders = pedidosBD;
+      } catch (err) {
+        console.error("No se pudo conectar al Backend local.", err);
+      }
+
       set({ data, revision, status: 'ready' })
     } catch (error) {
       set({ status: 'error', loadError: errorMessage(error) })
@@ -42,18 +57,38 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
 
     set({ busy: true })
     try {
-      // Control de concurrencia optimista: si otra pestaña guardó antes, no se sobrescribe.
+      
+      // >>> CONEXIÓN AL BACKEND <<<
+      if (command.type === 'ingredient/create') {
+        await apiInsumosService.createInsumo(command.payload);
+      } else if (command.type === 'stock/move') {
+        const payload = command.payload as any;
+        await apiInsumosService.updateStock(payload.id, payload);
+      } else if (command.type === 'order/create') {
+        await apiPedidosService.createPedido(command.payload);
+      } else if (command.type === 'order/changeStatus') {
+        const payload = command.payload as any;
+        await apiPedidosService.updateEstado(payload.id, payload.status);
+      }
+
       const saved = await kitchenRepository.read()
       if (saved.revision !== get().revision) {
         set({ data: saved.data, revision: saved.revision })
         throw new Error('Los datos cambiaron en otra pestaña. Revisa y vuelve a guardar.')
       }
+      
       const next = {
         data: applyCommand(saved.data, command, user.role),
         revision: saved.revision + 1,
       }
+      
+      // Mantenemos la BD local sincronizada con React
+      next.data.ingredients = get().data.ingredients;
+      next.data.orders = get().data.orders;
       await kitchenRepository.write(next)
-      set(next)
+      
+      get().load(); 
+
     } finally {
       set({ busy: false })
     }
@@ -62,7 +97,6 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
 
 export const useKitchenData = () => useKitchenStore((s) => s.data)
 
-// Al cerrar sesión se descarta el estado en memoria; se vuelve a leer en el próximo ingreso.
 useAuthStore.subscribe((auth, prev) => {
   if (prev.user && !auth.user)
     useKitchenStore.setState({ status: 'idle', data: createInitialState(), revision: 0 })

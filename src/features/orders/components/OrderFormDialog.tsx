@@ -58,7 +58,7 @@ function OrderForm({ onDone }: { onDone: () => void }) {
           <Input required maxLength={LIMITS.text} {...register('customer')} />
         </Field>
         <Field label="Fecha de entrega *">
-          <Input type="date" required {...register('date')} />
+          <Input type="date" min={todayIso()} required {...register('date')} />
         </Field>
         <Field label="Canal">
           <Select {...register('channel')}>

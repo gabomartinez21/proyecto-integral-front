@@ -1,0 +1,3501 @@
+﻿=== ARCHIVO: src\app\App.tsx
+import { RouterProvider } from 'react-router'
+import { Toaster } from '@/components/ui'
+import { router } from './router'
+
+export function App() {
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Toaster />
+    </>
+  )
+}
+
+=== ARCHIVO: src\app\guards.tsx
+import type { ReactNode } from 'react'
+import { Navigate, useLocation } from 'react-router'
+import { useCurrentUser } from '@/stores/auth.store'
+import { ROUTES } from './navigation'
+
+/** Solo deja pasar a usuarios con sesiÃ³n; si no, redirige al login. */
+export function RequireAuth({ children }: { children: ReactNode }) {
+  const user = useCurrentUser()
+  const location = useLocation()
+  if (!user) return <Navigate to={ROUTES.login} replace state={{ from: location.pathname }} />
+  return children
+}
+
+/** Evita mostrar el login a quien ya iniciÃ³ sesiÃ³n. */
+export function GuestOnly({ children }: { children: ReactNode }) {
+  const user = useCurrentUser()
+  if (user) return <Navigate to={ROUTES.dashboard} replace />
+  return children
+}
+
+=== ARCHIVO: src\app\navigation.ts
+import type { IconName } from '@/components/icons/Icon'
+
+export const ROUTES = {
+  login: '/login',
+  dashboard: '/',
+  orders: '/pedidos',
+  products: '/productos',
+  ingredients: '/insumos',
+  calendar: '/calendario',
+  shopping: '/compras',
+} as const
+
+export interface NavItem {
+  path: string
+  /** Nombre corto (breadcrumb y encabezado). */
+  title: string
+  /** Texto en el menÃº lateral. */
+  label: string
+  icon: IconName
+}
+
+export const NAV_ITEMS: readonly NavItem[] = [
+  { path: ROUTES.dashboard, title: 'Resumen', label: 'Resumen', icon: 'dashboard' },
+  { path: ROUTES.orders, title: 'Pedidos', label: 'Pedidos', icon: 'orders' },
+  { path: ROUTES.products, title: 'Productos', label: 'Productos y recetas', icon: 'products' },
+  { path: ROUTES.ingredients, title: 'Insumos', label: 'Insumos', icon: 'ingredients' },
+  { path: ROUTES.calendar, title: 'Calendario', label: 'Calendario', icon: 'calendar' },
+  { path: ROUTES.shopping, title: 'Compras', label: 'Lista de compras', icon: 'shopping' },
+]
+
+=== ARCHIVO: src\app\router.tsx
+import { createBrowserRouter, Navigate } from 'react-router'
+import { AppLayout } from '@/components/layout'
+import { LoginPage } from '@/features/auth'
+import { GuestOnly, RequireAuth } from './guards'
+import { ROUTES } from './navigation'
+
+// Cada pÃ¡gina se carga bajo demanda (code splitting) para que el primer render sea rÃ¡pido.
+export const router = createBrowserRouter([
+  {
+    path: ROUTES.login,
+    element: (
+      <GuestOnly>
+        <LoginPage />
+      </GuestOnly>
+    ),
+  },
+  {
+    path: ROUTES.dashboard,
+    element: (
+      <RequireAuth>
+        <AppLayout />
+      </RequireAuth>
+    ),
+    children: [
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('@/features/dashboard')).DashboardPage }),
+      },
+      {
+        path: ROUTES.orders,
+        lazy: async () => ({ Component: (await import('@/features/orders')).OrdersPage }),
+      },
+      {
+        path: ROUTES.products,
+        lazy: async () => ({ Component: (await import('@/features/products')).ProductsPage }),
+      },
+      {
+        path: ROUTES.ingredients,
+        lazy: async () => ({ Component: (await import('@/features/ingredients')).IngredientsPage }),
+      },
+      {
+        path: ROUTES.calendar,
+        lazy: async () => ({ Component: (await import('@/features/calendar')).CalendarPage }),
+      },
+      {
+        path: ROUTES.shopping,
+        lazy: async () => ({ Component: (await import('@/features/shopping')).ShoppingPage }),
+      },
+    ],
+  },
+  { path: '*', element: <Navigate to={ROUTES.dashboard} replace /> },
+])
+
+=== ARCHIVO: src\components\icons\HeroArt.tsx
+export const HeroArt = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 220 140" fill="none" aria-hidden="true">
+    <ellipse cx="112" cy="127" rx="86" ry="9" fill="#d9e2ce" />
+    <path d="M65 75h105l-13 43H80z" fill="#54745a" />
+    <path d="M56 74h123" stroke="#315840" strokeWidth="7" strokeLinecap="round" />
+    <path
+      d="M94 71c-21-14-43-16-43-35 27-3 36 17 43 35M113 71c-9-37 5-47 12-57 11 25 6 38-12 57M132 70c4-28 26-37 46-32-8 24-30 26-46 32"
+      fill="#8ca06d"
+    />
+    <path d="M103 74c-20-17-4-40 10-36 19 6 17 21 7 36" fill="#cf9867" />
+    <circle cx="148" cy="67" r="15" fill="#dfb46c" />
+    <path d="M37 104h28M46 94v20M190 79v16M182 87h16" stroke="#acb78b" strokeWidth="2" />
+  </svg>
+)
+
+=== ARCHIVO: src\components\icons\Icon.tsx
+import type { ReactNode } from 'react'
+
+const paths = {
+  dashboard: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </>
+  ),
+  orders: <path d="M7 4H5v17h14V4h-2M9 3h6v4H9zM8 12h8M8 16h5" />,
+  products: <path d="M4 8l8-5 8 5v11l-8 3-8-3zM4 8l8 4 8-4M12 12v10" />,
+  ingredients: <path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6" />,
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M7 2v6M17 2v6M3 11h18M7 15h2M14 15h2" />
+    </>
+  ),
+  shopping: <path d="M2 3h3l3 13h11l3-9H6M10 21h.01M18 21h.01" />,
+} satisfies Record<string, ReactNode>
+
+export type IconName = keyof typeof paths
+
+export const Icon = ({ name }: { name: IconName }) => (
+  <svg
+    className="size-[19px] shrink-0"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.6}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {paths[name]}
+  </svg>
+)
+
+=== ARCHIVO: src\components\layout\AppLayout.tsx
+import { Suspense, useEffect } from 'react'
+import { Outlet } from 'react-router'
+import { Button } from '@/components/ui'
+import { useKitchenStore } from '@/stores/kitchen.store'
+import { LoadingScreen } from './LoadingScreen'
+import { Sidebar } from './Sidebar'
+import { Topbar } from './Topbar'
+
+export function AppLayout() {
+  const status = useKitchenStore((s) => s.status)
+  const loadError = useKitchenStore((s) => s.loadError)
+  const load = useKitchenStore((s) => s.load)
+
+  useEffect(() => {
+    if (status === 'idle') void load()
+  }, [status, load])
+
+  if (status === 'error')
+    return (
+      <div className="p-20 text-center">
+        <h2>No se pudieron leer los datos locales</h2>
+        <p>{loadError}</p>
+        <p>
+          Habilita el almacenamiento del navegador. Conserva una copia de tus datos antes de borrar
+          el almacenamiento.
+        </p>
+        <Button onClick={() => void load()}>Reintentar</Button>
+      </div>
+    )
+
+  if (status !== 'ready') return <LoadingScreen />
+
+  return (
+    <div className="min-h-screen md:grid md:grid-cols-[200px_1fr] lg:grid-cols-[235px_1fr] print:block">
+      <Sidebar />
+      <div className="min-w-0">
+        <Topbar />
+        <main className="mx-auto max-w-[1550px] px-4 py-[23px] md:px-[23px] md:py-7 lg:px-[38px] lg:py-[34px] 2xl:px-[55px] 2xl:py-[45px] print:p-0">
+          <Suspense fallback={<LoadingScreen />}>
+            <Outlet />
+          </Suspense>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+=== ARCHIVO: src\components\layout\Brand.tsx
+export const Brand = () => (
+  <div className="flex items-center gap-[11px] px-0 pb-[15px] md:px-[5px] md:pb-[35px]">
+    <span className="grid size-[43px] place-items-center rounded-[14px] bg-brand text-[25px] text-gold">
+      â™§
+    </span>
+    <div>
+      <small className="text-[9px] font-bold tracking-[3px]">SABORES DE</small>
+      <strong className="block font-serif text-xl leading-[1.1] md:text-[22px]">Barbarita</strong>
+    </div>
+  </div>
+)
+
+=== ARCHIVO: src\components\layout\Eyebrow.tsx
+import type { ReactNode } from 'react'
+import { cn } from '@/lib/cn'
+
+export const Eyebrow = ({ children, className }: { children: ReactNode; className?: string }) => (
+  <div className={cn('text-[10px] font-bold tracking-[1.8px] text-muted uppercase', className)}>
+    {children}
+  </div>
+)
+
+=== ARCHIVO: src\components\layout\index.ts
+export * from './AppLayout'
+export * from './Brand'
+export * from './Eyebrow'
+export * from './LoadingScreen'
+export * from './PageHeader'
+export * from './WeekToolbar'
+
+=== ARCHIVO: src\components\layout\LoadingScreen.tsx
+export const LoadingScreen = () => (
+  <div className="p-20 text-center text-muted">Preparando tu cocinaâ€¦</div>
+)
+
+=== ARCHIVO: src\components\layout\PageHeader.tsx
+import type { ReactNode } from 'react'
+import { useCurrentNavItem } from '@/hooks/useCurrentNavItem'
+import { Eyebrow } from './Eyebrow'
+
+interface PageHeaderProps {
+  title: string
+  subtitle: string
+  /** AcciÃ³n principal de la pÃ¡gina (p. ej. botÃ³n "Nuevo â€¦"). */
+  action?: ReactNode
+}
+
+export function PageHeader({ title, subtitle, action }: PageHeaderProps) {
+  const current = useCurrentNavItem()
+  return (
+    <div className="mb-[27px] flex items-start justify-between gap-5 md:items-center print:hidden">
+      <div>
+        <Eyebrow className="mb-2.5">Mi cocina / {current.title}</Eyebrow>
+        <h1 className="mb-[9px]">{title}</h1>
+        <p className="mb-0 leading-relaxed text-muted">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  )
+}
+
+=== ARCHIVO: src\components\layout\Sidebar.tsx
+import { NavLink } from 'react-router'
+import { NAV_ITEMS } from '@/app/navigation'
+import { Icon } from '@/components/icons/Icon'
+import { cn } from '@/lib/cn'
+import { Brand } from './Brand'
+import { Eyebrow } from './Eyebrow'
+
+export function Sidebar() {
+  return (
+    <aside className="flex flex-col border-r border-line bg-white p-3.5 md:sticky md:top-0 md:h-screen md:px-[13px] md:py-[25px] lg:px-5 lg:py-[30px] print:hidden">
+      <Brand />
+      <Eyebrow className="hidden p-3 md:block">Mi negocio</Eyebrow>
+      <nav aria-label="Principal" className="flex gap-[7px] overflow-auto md:grid">
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-[13px] rounded-lg p-2.5 font-medium whitespace-nowrap text-[#717a73] transition hover:bg-canvas md:p-[13px]',
+                isActive && 'bg-brand-soft font-bold text-brand-ink hover:bg-brand-soft',
+              )
+            }
+          >
+            <Icon name={item.icon} />
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="mt-auto hidden px-[5px] pt-5 text-xs text-muted md:block">
+        Surquillo, Lima Â· PerÃº
+      </div>
+    </aside>
+  )
+}
+
+=== ARCHIVO: src\components\layout\Topbar.tsx
+import { Button } from '@/components/ui'
+import { useCurrentNavItem } from '@/hooks/useCurrentNavItem'
+import { useAuthStore } from '@/stores/auth.store'
+
+export function Topbar() {
+  const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+  const current = useCurrentNavItem()
+  if (!user) return null
+
+  return (
+    <header className="flex h-[60px] items-center justify-between gap-[15px] border-b border-line bg-white/70 px-[17px] md:h-20 md:px-[23px] lg:px-[38px] print:hidden">
+      <span className="hidden text-muted md:inline">
+        Mi cocina <span className="px-3 text-[#bcc3b7]">/</span>
+        <strong className="text-[#52614b]">{current.title}</strong>
+      </span>
+      <div className="flex max-w-[75%] items-center gap-2.5 overflow-hidden text-xs md:ml-auto">
+        <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-[#e8ecdf] font-bold">
+          {user.name.slice(0, 1).toUpperCase()}
+        </span>
+        <span>
+          {user.name}
+          <small className="block text-muted">
+            {user.role === 'owner' ? 'DueÃ±o Â· Acceso completo' : 'Empleado Â· GestiÃ³n de pedidos'}
+          </small>
+        </span>
+      </div>
+      <Button variant="link" onClick={() => void logout()}>
+        Salir
+      </Button>
+    </header>
+  )
+}
+
+=== ARCHIVO: src\components\layout\WeekToolbar.tsx
+import { Button } from '@/components/ui'
+import { addDays, parseIso } from '@/lib/dates'
+import { formatShortDate } from '@/lib/format'
+import { useWeekStore } from '@/stores/week.store'
+
+export function WeekToolbar() {
+  const { start, shift } = useWeekStore()
+  const end = addDays(start, 6)
+
+  return (
+    <div className="mb-[22px] flex flex-wrap items-center gap-3 print:hidden">
+      <Button aria-label="Semana anterior" onClick={() => shift(-1)}>
+        â†
+      </Button>
+      <strong>
+        {formatShortDate(start)} â€“ {formatShortDate(end)}, {parseIso(start).getUTCFullYear()}
+      </strong>
+      <Button aria-label="Semana siguiente" onClick={() => shift(1)}>
+        â†’
+      </Button>
+    </div>
+  )
+}
+
+=== ARCHIVO: src\components\ui\Badge.tsx
+import type { ReactNode } from 'react'
+import { cn } from '@/lib/cn'
+
+const tones = {
+  neutral: 'bg-[#edf0e9] text-[#68775c]',
+  warn: 'bg-warn-soft text-warn',
+  success: 'bg-[#e9f0e1] text-[#597d43]',
+  info: 'bg-[#e1efed] text-[#337568]',
+  danger: 'bg-[#f9e9e4] text-[#9e5a4c]',
+  glass: 'bg-white/80 text-[#68775c]',
+} as const
+
+export type BadgeTone = keyof typeof tones
+
+interface BadgeProps {
+  tone?: BadgeTone
+  className?: string
+  children: ReactNode
+}
+
+export function Badge({ tone = 'neutral', className, children }: BadgeProps) {
+  return (
+    <span
+      className={cn(
+        'inline-block rounded-[5px] px-2 py-[5px] text-[10px] font-bold',
+        tones[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+=== ARCHIVO: src\components\ui\Button.tsx
+import type { ComponentProps } from 'react'
+import { cn } from '@/lib/cn'
+
+const variants = {
+  default: 'border-line bg-white text-ink hover:brightness-[.97]',
+  primary: 'border-brand bg-brand text-white hover:brightness-110',
+  secondary: 'border-sage-200 bg-sage-100 text-ink',
+  danger: 'border-line bg-white text-danger hover:bg-red-50',
+  link: 'border-0 bg-transparent p-0 text-xs text-link hover:underline',
+} as const
+
+export type ButtonVariant = keyof typeof variants
+
+interface ButtonProps extends ComponentProps<'button'> {
+  variant?: ButtonVariant
+}
+
+export function Button({ variant = 'default', type = 'button', className, ...props }: ButtonProps) {
+  return (
+    <button
+      type={type}
+      className={cn(
+        'rounded-lg border px-[15px] py-2.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 print:hidden',
+        variants[variant],
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+=== ARCHIVO: src\components\ui\Feedback.tsx
+import type { ReactNode } from 'react'
+import { cn } from '@/lib/cn'
+
+interface EmptyStateProps {
+  title?: string
+  children?: ReactNode
+  className?: string
+}
+
+export const EmptyState = ({ title, children, className }: EmptyStateProps) => (
+  <div className={cn('px-5 py-[38px] text-center leading-[1.7] text-[#879080]', className)}>
+    {title && <strong className="mb-[7px] block text-[#52644b]">{title}</strong>}
+    {children}
+  </div>
+)
+
+export const Notice = ({ children, className }: { children: ReactNode; className?: string }) => (
+  <div className={cn('my-3.5 rounded-lg bg-sage-50 p-3 text-xs leading-relaxed', className)}>
+    {children}
+  </div>
+)
+
+export const Footnote = ({ children }: { children: ReactNode }) => (
+  <p className="my-5 text-[11px] leading-[1.7] text-subtle print:hidden">{children}</p>
+)
+
+=== ARCHIVO: src\components\ui\Form.tsx
+import type { ComponentProps, ReactNode } from 'react'
+import { cn } from '@/lib/cn'
+
+const control =
+  'w-full rounded-[7px] border border-field bg-white px-3 py-[11px] text-ink disabled:bg-canvas disabled:opacity-70'
+
+export const Input = ({ className, ...props }: ComponentProps<'input'>) => (
+  <input className={cn(control, className)} {...props} />
+)
+
+export const Select = ({ className, ...props }: ComponentProps<'select'>) => (
+  <select className={cn(control, className)} {...props} />
+)
+
+export const Textarea = ({ className, ...props }: ComponentProps<'textarea'>) => (
+  <textarea className={cn(control, 'min-h-[70px] resize-y', className)} {...props} />
+)
+
+interface FieldProps {
+  label: string
+  className?: string
+  children: ReactNode
+}
+
+/** Etiqueta + control. El `<label>` envuelve al control, asÃ­ no hacen falta ids. */
+export const Field = ({ label, className, children }: FieldProps) => (
+  <label className={cn('grid gap-[7px] text-xs font-semibold', className)}>
+    {label}
+    {children}
+  </label>
+)
+
+export const FormGrid = ({ children }: { children: ReactNode }) => (
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
+)
+
+export const FormError = ({ message }: { message?: string | null }) => (
+  <div role="alert" className="mt-[15px] text-[13px] text-error empty:hidden">
+    {message}
+  </div>
+)
+
+export const FormActions = ({ children }: { children: ReactNode }) => (
+  <div className="mt-[25px] flex justify-end gap-2.5">{children}</div>
+)
+
+=== ARCHIVO: src\components\ui\index.ts
+export * from './Badge'
+export * from './Button'
+export * from './Feedback'
+export * from './Form'
+export * from './ListRow'
+export * from './Modal'
+export * from './Panel'
+export * from './StatCard'
+export * from './StatusBadge'
+export * from './Table'
+export * from './Toaster'
+
+=== ARCHIVO: src\components\ui\ListRow.tsx
+import type { ReactNode } from 'react'
+
+interface ListRowProps {
+  title: ReactNode
+  subtitle?: ReactNode
+  aside?: ReactNode
+}
+
+export const ListRow = ({ title, subtitle, aside }: ListRowProps) => (
+  <div className="flex items-center justify-between gap-[15px] border-b border-line py-3.5 last:border-0">
+    <div>
+      <strong>{title}</strong>
+      {subtitle && <small className="mt-[5px] block text-muted">{subtitle}</small>}
+    </div>
+    {aside}
+  </div>
+)
+
+=== ARCHIVO: src\components\ui\Modal.tsx
+import { useEffect, useRef, type ReactNode } from 'react'
+
+interface ModalProps {
+  open: boolean
+  title: string
+  onClose: () => void
+  children: ReactNode
+}
+
+/** Modal accesible basado en `<dialog>` nativo (foco atrapado y cierre con Esc). */
+export function Modal({ open, title, onClose, children }: ModalProps) {
+  const ref = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      aria-labelledby="modal-title"
+      className="m-auto max-h-[90vh] w-[min(650px,94vw)] rounded-[17px] border border-line p-[27px] text-ink shadow-[0_30px_100px_#16372233] print:hidden"
+    >
+      {open && (
+        <>
+          <div className="flex items-center justify-between gap-[15px]">
+            <h2 id="modal-title">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="rounded-lg p-1.5 text-[22px] leading-none hover:bg-canvas"
+            >
+              Ã—
+            </button>
+          </div>
+          {children}
+        </>
+      )}
+    </dialog>
+  )
+}
+
+=== ARCHIVO: src\components\ui\Panel.tsx
+import type { ReactNode } from 'react'
+import { cn } from '@/lib/cn'
+
+interface PanelProps {
+  className?: string
+  children: ReactNode
+}
+
+export const Panel = ({ className, children }: PanelProps) => (
+  <section
+    className={cn(
+      'mb-[22px] rounded-[13px] border border-line bg-white p-[17px] md:p-[23px] print:m-0 print:break-inside-avoid print:border-0 print:p-0',
+      className,
+    )}
+  >
+    {children}
+  </section>
+)
+
+interface PanelHeaderProps {
+  title: string
+  children?: ReactNode
+}
+
+export const PanelHeader = ({ title, children }: PanelHeaderProps) => (
+  <div className="mb-[18px] flex items-center justify-between gap-3">
+    <h2 className="m-0">{title}</h2>
+    {children}
+  </div>
+)
+
+=== ARCHIVO: src\components\ui\StatCard.tsx
+import type { ReactNode } from 'react'
+import { Icon, type IconName } from '@/components/icons/Icon'
+
+interface StatCardProps {
+  label: string
+  value: ReactNode
+  hint: string
+  icon?: IconName
+}
+
+export const StatCard = ({ label, value, hint, icon }: StatCardProps) => (
+  <div className="rounded-xl border border-line bg-white p-[15px] lg:p-[21px]">
+    <div className="flex items-center justify-between text-xs text-[#727b70]">
+      {label}
+      {icon && (
+        <span className="flex rounded-[9px] bg-[#f0f3eb] p-2">
+          <Icon name={icon} />
+        </span>
+      )}
+    </div>
+    <strong className="mt-3.5 mb-[5px] block font-display text-[26px] tracking-[-1px] md:text-[30px]">
+      {value}
+    </strong>
+    <small className="text-[11px] text-muted">{hint}</small>
+  </div>
+)
+
+export const StatGrid = ({ children }: { children: ReactNode }) => (
+  <div className="mb-7 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-[17px] print:hidden">
+    {children}
+  </div>
+)
+
+=== ARCHIVO: src\components\ui\StatusBadge.tsx
+import type { OrderStatus } from '@/domain'
+import { Badge, type BadgeTone } from './Badge'
+
+const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
+  Pendiente: 'warn',
+  Confirmado: 'success',
+  Entregado: 'info',
+  Cancelado: 'danger',
+}
+
+export const StatusBadge = ({ status }: { status: OrderStatus }) => (
+  <Badge tone={STATUS_TONE[status]}>{status}</Badge>
+)
+
+=== ARCHIVO: src\components\ui\Table.tsx
+import type { ComponentProps, ReactNode } from 'react'
+import { cn } from '@/lib/cn'
+
+export const Table = ({ children }: { children: ReactNode }) => (
+  <div className="overflow-auto">
+    <table className="w-full border-collapse text-left whitespace-nowrap print:whitespace-normal">
+      {children}
+    </table>
+  </div>
+)
+
+const cell = 'border-b border-line-soft px-3 py-3.5'
+
+export const Th = ({ className, ...props }: ComponentProps<'th'>) => (
+  <th
+    className={cn(
+      cell,
+      'bg-[#fafbf8] text-[10px] font-semibold tracking-[0.6px] text-[#889084] uppercase',
+      className,
+    )}
+    {...props}
+  />
+)
+
+export const Td = ({ className, ...props }: ComponentProps<'td'>) => (
+  <td
+    className={cn(cell, 'text-xs print:text-xs [tr:last-child_&]:border-b-0', className)}
+    {...props}
+  />
+)
+
+export const Tr = (props: ComponentProps<'tr'>) => (
+  <tr className="print:break-inside-avoid" {...props} />
+)
+
+=== ARCHIVO: src\components\ui\Toaster.tsx
+import { useEffect } from 'react'
+import { useToastStore } from '@/stores/toast.store'
+
+const DURATION_MS = 4000
+
+export function Toaster() {
+  const { message, key, dismiss } = useToastStore()
+
+  useEffect(() => {
+    if (!message) return
+    const timer = setTimeout(dismiss, DURATION_MS)
+    return () => clearTimeout(timer)
+  }, [message, key, dismiss])
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed right-[26px] bottom-[26px] z-20 max-w-[90vw] rounded-[10px] bg-brand px-[22px] py-[15px] text-white shadow-[0_5px_25px_#15312233] empty:hidden print:hidden"
+    >
+      {message}
+    </div>
+  )
+}
+
+=== ARCHIVO: src\domain\commands\demo.ts
+import { DEMO_INGREDIENTS, DEMO_PRODUCTS } from '../demo-data'
+import { fail } from '../errors'
+import type { CommandHandler } from './types'
+
+export const loadDemo: CommandHandler<'demo/load'> = (draft) => {
+  if (draft.products.length || draft.ingredients.length || draft.orders.length)
+    fail('Los ejemplos solo se cargan en una base vacÃ­a.')
+  draft.ingredients = structuredClone(DEMO_INGREDIENTS)
+  draft.products = structuredClone(DEMO_PRODUCTS)
+}
+
+=== ARCHIVO: src\domain\commands\index.ts
+import { fail } from '../errors'
+import type { KitchenState, Role } from '../types'
+import { loadDemo } from './demo'
+import { createIngredient } from './ingredient'
+import { changeOrderStatus, createOrder } from './order'
+import { saveProduct } from './product'
+import { saveRecipe } from './recipe'
+import { moveStock } from './stock'
+import type { CommandHandler, CommandType, KitchenCommand } from './types'
+
+export type * from './types'
+
+const handlers: { [K in CommandType]: CommandHandler<K> } = {
+  'product/save': saveProduct,
+  'ingredient/create': createIngredient,
+  'stock/move': moveStock,
+  'recipe/save': saveRecipe,
+  'order/create': createOrder,
+  'order/changeStatus': changeOrderStatus,
+  'demo/load': loadDemo,
+}
+
+/** Comandos que un empleado puede ejecutar; el resto requiere rol de dueÃ±o. */
+const EMPLOYEE_COMMANDS: ReadonlySet<CommandType> = new Set(['order/create', 'order/changeStatus'])
+
+export function canExecute(role: Role, type: CommandType): boolean {
+  return role === 'owner' || EMPLOYEE_COMMANDS.has(type)
+}
+
+/**
+ * Aplica un comando de forma inmutable: devuelve un estado nuevo o lanza
+ * `DomainError` si alguna regla de negocio no se cumple.
+ */
+export function applyCommand(
+  state: KitchenState,
+  command: KitchenCommand,
+  role: Role = 'owner',
+): KitchenState {
+  if (!canExecute(role, command.type)) fail('Requiere permisos de dueÃ±o.')
+  const draft = structuredClone(state)
+  const handler = handlers[command.type] as CommandHandler<typeof command.type>
+  handler(draft, command.payload as never)
+  return draft
+}
+
+=== ARCHIVO: src\domain\commands\ingredient.ts
+import { UNITS } from '../constants'
+import { fail } from '../errors'
+import { createId } from '../utils'
+import { requireNumber, requireOneOf, requireText } from '../validators'
+import type { CommandHandler } from './types'
+
+export const createIngredient: CommandHandler<'ingredient/create'> = (draft, p) => {
+  const name = requireText(p.name, 'El nombre')
+  if (draft.ingredients.some((x) => x.name.toLowerCase() === name.toLowerCase()))
+    fail('El insumo ya existe.')
+
+  draft.ingredients.push({
+    id: createId(),
+    name,
+    unit: requireOneOf(p.unit, UNITS, 'Unidad invÃ¡lida.'),
+    stock: requireNumber(p.stock, 'El stock'),
+    minimum: requireNumber(p.minimum, 'El mÃ­nimo'),
+    cost: requireNumber(p.cost, 'El costo unitario'),
+  })
+}
+
+=== ARCHIVO: src\domain\commands\order.ts
+import { ORDER_CHANNELS, ORDER_TRANSITIONS } from '../constants'
+import { fail } from '../errors'
+import { orderNeeds, reservedQuantities } from '../inventory'
+import { createId, round } from '../utils'
+import {
+  isValidIsoDate,
+  optionalText,
+  requireNumber,
+  requireOneOf,
+  requireText,
+} from '../validators'
+import type { CommandHandler } from './types'
+
+export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
+  const customer = requireText(p.customer, 'El cliente')
+  if (!isValidIsoDate(p.date)) fail('La fecha no es vÃ¡lida.')
+  const channel = requireOneOf(p.channel, ORDER_CHANNELS, 'Canal invÃ¡lido.')
+  if (!Array.isArray(p.items) || !p.items.length) fail('Agrega al menos un producto.')
+
+  const items = p.items.map((line) => {
+    const product = draft.products.find((x) => x.id === line.productId)
+    if (!product || !product.recipe.length) fail('Cada producto debe tener una receta definida.')
+    const quantity = requireNumber(line.quantity, 'La cantidad', 1)
+    if (!Number.isInteger(quantity)) fail('La cantidad de productos debe ser entera.')
+    return {
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      quantity,
+      // Se copia la receta: los pedidos existentes no cambian si luego se edita.
+      recipe: structuredClone(product.recipe),
+    }
+  })
+
+  draft.orders.push({
+    id: createId(),
+    number: draft.orders.length + 1,
+    customer,
+    date: p.date,
+    channel,
+    notes: optionalText(p.notes),
+    items,
+    status: 'Pendiente',
+    created: new Date().toISOString(),
+  })
+}
+
+export const changeOrderStatus: CommandHandler<'order/changeStatus'> = (draft, p) => {
+  const order = draft.orders.find((x) => x.id === p.id)
+  if (!order) fail('Pedido inexistente.')
+  if (!ORDER_TRANSITIONS[order.status]?.includes(p.status)) fail('Cambio de estado no permitido.')
+  const needs = orderNeeds(order)
+
+  if (p.status === 'Confirmado') {
+    const reserved = reservedQuantities(draft, order.id)
+    for (const [ingredientId, quantity] of Object.entries(needs)) {
+      const ingredient = draft.ingredients.find((i) => i.id === ingredientId)
+      if (!ingredient || round(ingredient.stock - (reserved[ingredientId] ?? 0)) < quantity)
+        fail(`Stock insuficiente: ${ingredient?.name ?? 'insumo'}. Revisa la lista de compras.`)
+    }
+  }
+
+  if (p.status === 'Entregado') {
+    for (const [ingredientId, quantity] of Object.entries(needs)) {
+      const ingredient = draft.ingredients.find((i) => i.id === ingredientId)
+      if (!ingredient || ingredient.stock < quantity) fail('Stock insuficiente.')
+      ingredient.stock = round(ingredient.stock - quantity)
+      draft.movements.push({
+        id: createId(),
+        date: new Date().toISOString(),
+        ingredient: ingredient.name,
+        quantity: -quantity,
+        unit: ingredient.unit,
+        note: `Entrega de pedido #${order.number}`,
+      })
+    }
+  }
+
+  order.status = p.status as typeof order.status
+}
+
+=== ARCHIVO: src\domain\commands\product.ts
+import { PRODUCT_CATEGORIES } from '../constants'
+import { fail } from '../errors'
+import { createId } from '../utils'
+import { optionalText, requireNumber, requireOneOf, requireText } from '../validators'
+import type { CommandHandler } from './types'
+
+export const saveProduct: CommandHandler<'product/save'> = (draft, p) => {
+  const name = requireText(p.name, 'El nombre')
+  const duplicated = draft.products.some(
+    (x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase() && x.id !== p.id,
+  )
+  if (duplicated) fail('Ya existe un producto con ese nombre.')
+
+  const record = {
+    id: p.id || createId(),
+    name,
+    category: requireOneOf(p.category, PRODUCT_CATEGORIES, 'CategorÃ­a invÃ¡lida.'),
+    price: requireNumber(p.price, 'El precio'),
+    description: optionalText(p.description),
+  }
+
+  const existing = p.id ? draft.products.find((x) => x.id === p.id) : undefined
+  if (p.id && !existing) fail('Producto inexistente.')
+  if (existing) Object.assign(existing, record)
+  else draft.products.push({ ...record, recipe: [] })
+}
+
+=== ARCHIVO: src\domain\commands\recipe.ts
+import { LIMITS } from '../constants'
+import { fail } from '../errors'
+import { requireNumber } from '../validators'
+import type { CommandHandler } from './types'
+
+export const saveRecipe: CommandHandler<'recipe/save'> = (draft, p) => {
+  const product = draft.products.find((x) => x.id === p.id)
+  if (!product) fail('Producto inexistente.')
+  if (!Array.isArray(p.recipe)) fail('Receta invÃ¡lida.')
+
+  const seen = new Set<string>()
+  product.recipe = p.recipe.map((line) => {
+    if (!draft.ingredients.some((i) => i.id === line.ingredientId))
+      fail('Primero debes registrar el insumo.')
+    if (seen.has(line.ingredientId)) fail('No repitas un ingrediente.')
+    seen.add(line.ingredientId)
+    return {
+      ingredientId: line.ingredientId,
+      quantity: requireNumber(line.quantity, 'La cantidad', LIMITS.minPositive),
+    }
+  })
+}
+
+=== ARCHIVO: src\domain\commands\stock.ts
+import { LIMITS, STOCK_MOVEMENT_KINDS } from '../constants'
+import { fail } from '../errors'
+import { reservedQuantities } from '../inventory'
+import { createId, round } from '../utils'
+import { requireNumber, requireOneOf, requireText } from '../validators'
+import type { CommandHandler } from './types'
+
+export const moveStock: CommandHandler<'stock/move'> = (draft, p) => {
+  const ingredient = draft.ingredients.find((x) => x.id === p.id)
+  if (!ingredient) fail('Insumo inexistente.')
+
+  const quantity = requireNumber(p.quantity, 'La cantidad', LIMITS.minPositive)
+  const kind = requireOneOf(p.kind, STOCK_MOVEMENT_KINDS, 'Movimiento invÃ¡lido.')
+  const delta = kind === 'entrada' ? quantity : -quantity
+
+  if (ingredient.stock + delta < (reservedQuantities(draft)[ingredient.id] ?? 0))
+    fail('No puedes retirar stock reservado para pedidos.')
+
+  ingredient.stock = round(ingredient.stock + delta)
+  draft.movements.push({
+    id: createId(),
+    date: new Date().toISOString(),
+    ingredient: ingredient.name,
+    quantity: delta,
+    unit: ingredient.unit,
+    note: requireText(p.note, 'El motivo'),
+  })
+}
+
+=== ARCHIVO: src\domain\commands\types.ts
+import type { KitchenState } from '../types'
+import type { NumericInput } from '../validators'
+
+export interface ProductInput {
+  id?: string
+  name: string
+  category: string
+  price: NumericInput
+  description?: string
+}
+
+export interface IngredientInput {
+  name: string
+  unit: string
+  stock: NumericInput
+  minimum: NumericInput
+  cost: NumericInput
+}
+
+export interface StockMovementInput {
+  id: string
+  kind: string
+  quantity: NumericInput
+  note: string
+}
+
+export interface RecipeInput {
+  id: string
+  recipe: { ingredientId: string; quantity: NumericInput }[]
+}
+
+export interface OrderInput {
+  customer: string
+  date: string
+  channel: string
+  notes?: string
+  items: { productId: string; quantity: NumericInput }[]
+}
+
+export interface OrderStatusInput {
+  id: string
+  status: string
+}
+
+/** Todas las operaciones que modifican el estado de la cocina. */
+export type KitchenCommand =
+  | { type: 'product/save'; payload: ProductInput }
+  | { type: 'ingredient/create'; payload: IngredientInput }
+  | { type: 'stock/move'; payload: StockMovementInput }
+  | { type: 'recipe/save'; payload: RecipeInput }
+  | { type: 'order/create'; payload: OrderInput }
+  | { type: 'order/changeStatus'; payload: OrderStatusInput }
+  | { type: 'demo/load'; payload?: undefined }
+
+export type CommandType = KitchenCommand['type']
+
+/** Un handler recibe una copia del estado y la modifica directamente. */
+export type CommandHandler<T extends CommandType> = (
+  draft: KitchenState,
+  payload: Extract<KitchenCommand, { type: T }>['payload'],
+) => void
+
+=== ARCHIVO: src\domain\__tests__\commands.test.ts
+import { describe, expect, it } from 'vitest'
+import { applyCommand, createInitialState, DomainError, reservedQuantities, shoppingList } from '..'
+import type { KitchenState } from '..'
+
+const withDemo = () => applyCommand(createInitialState(), { type: 'demo/load' })
+
+function withOrder(state: KitchenState, quantity = 1, date = '2026-10-28') {
+  return applyCommand(state, {
+    type: 'order/create',
+    payload: {
+      customer: 'Ana',
+      date,
+      channel: 'WhatsApp',
+      items: [{ productId: 'torta', quantity }],
+    },
+  })
+}
+
+describe('applyCommand', () => {
+  it('no muta el estado original', () => {
+    const initial = createInitialState()
+    const next = applyCommand(initial, { type: 'demo/load' })
+    expect(initial.products).toHaveLength(0)
+    expect(next.products).toHaveLength(2)
+  })
+
+  it('impide a un empleado ejecutar comandos de dueÃ±o', () => {
+    expect(() =>
+      applyCommand(
+        createInitialState(),
+        {
+          type: 'ingredient/create',
+          payload: { name: 'Sal', unit: 'kg', stock: 1, minimum: 0, cost: 1 },
+        },
+        'employee',
+      ),
+    ).toThrow('Requiere permisos de dueÃ±o.')
+  })
+
+  it('rechaza productos con nombre duplicado', () => {
+    expect(() =>
+      applyCommand(withDemo(), {
+        type: 'product/save',
+        payload: { name: 'torta de chocolate', category: 'Postres', price: 10 },
+      }),
+    ).toThrow(DomainError)
+  })
+
+  it('crea pedidos pendientes con copia de la receta', () => {
+    const state = withOrder(withDemo(), 2)
+    expect(state.orders[0]).toMatchObject({ number: 1, status: 'Pendiente', customer: 'Ana' })
+    expect(state.orders[0]?.items[0]?.recipe).toHaveLength(4)
+  })
+
+  it('reserva insumos al confirmar y los descuenta al entregar', () => {
+    let state = withOrder(withDemo())
+    const id = state.orders[0]!.id
+    state = applyCommand(state, {
+      type: 'order/changeStatus',
+      payload: { id, status: 'Confirmado' },
+    })
+    expect(reservedQuantities(state).chocolate).toBe(0.5)
+
+    state = applyCommand(state, {
+      type: 'order/changeStatus',
+      payload: { id, status: 'Entregado' },
+    })
+    expect(reservedQuantities(state).chocolate).toBeUndefined()
+    expect(state.ingredients.find((i) => i.id === 'chocolate')?.stock).toBe(1.5)
+    expect(state.movements).toHaveLength(4)
+  })
+
+  it('no confirma pedidos sin stock suficiente', () => {
+    const state = withOrder(withDemo(), 5) // 2.5 kg de chocolate, hay 2 kg
+    const id = state.orders[0]!.id
+    expect(() =>
+      applyCommand(state, { type: 'order/changeStatus', payload: { id, status: 'Confirmado' } }),
+    ).toThrow(/Stock insuficiente: Chocolate bitter/)
+  })
+
+  it('no permite transiciones invÃ¡lidas', () => {
+    const state = withOrder(withDemo())
+    const id = state.orders[0]!.id
+    expect(() =>
+      applyCommand(state, { type: 'order/changeStatus', payload: { id, status: 'Entregado' } }),
+    ).toThrow('Cambio de estado no permitido.')
+  })
+
+  it('no permite retirar stock reservado', () => {
+    let state = withOrder(withDemo(), 4) // 2 kg de chocolate
+    const id = state.orders[0]!.id
+    state = applyCommand(state, {
+      type: 'order/changeStatus',
+      payload: { id, status: 'Confirmado' },
+    })
+    expect(() =>
+      applyCommand(state, {
+        type: 'stock/move',
+        payload: { id: 'chocolate', kind: 'salida', quantity: 0.1, note: 'Merma' },
+      }),
+    ).toThrow('No puedes retirar stock reservado para pedidos.')
+  })
+})
+
+describe('shoppingList', () => {
+  it('calcula lo que falta comprar en el rango', () => {
+    const state = withOrder(withDemo(), 5)
+    const chocolate = shoppingList(state, '2026-10-26', '2026-11-01').find(
+      (i) => i.id === 'chocolate',
+    )
+    expect(chocolate).toMatchObject({ required: 2.5, available: 2, buy: 0.5 })
+  })
+
+  it('ignora pedidos fuera del rango', () => {
+    const state = withOrder(withDemo(), 1, '2026-12-01')
+    expect(shoppingList(state, '2026-10-26', '2026-11-01')).toHaveLength(0)
+  })
+})
+
+=== ARCHIVO: src\domain\constants.ts
+export const PRODUCT_CATEGORIES = ['Viandas', 'Postres', 'Eventos', 'Otros'] as const
+export const UNITS = ['kg', 'L', 'unidad'] as const
+export const ORDER_CHANNELS = ['WhatsApp', 'Instagram', 'Directo'] as const
+export const ORDER_STATUSES = ['Pendiente', 'Confirmado', 'Entregado', 'Cancelado'] as const
+export const STOCK_MOVEMENT_KINDS = ['entrada', 'salida'] as const
+export const ROLES = ['owner', 'employee'] as const
+
+/** Estados en los que un pedido sigue "en curso" (por preparar o entregar). */
+export const ACTIVE_ORDER_STATUSES = ['Pendiente', 'Confirmado'] as const
+
+/** MÃ¡quina de estados de un pedido: desde cada estado, a cuÃ¡les se puede pasar. */
+export const ORDER_TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
+  Pendiente: ['Confirmado', 'Cancelado'],
+  Confirmado: ['Entregado', 'Cancelado'],
+}
+
+export const LIMITS = {
+  text: 150,
+  longText: 500,
+  maxNumber: 1e9,
+  minPositive: 0.000001,
+} as const
+
+=== ARCHIVO: src\domain\demo-data.ts
+import type { Ingredient, Product } from './types'
+
+export const DEMO_INGREDIENTS: Ingredient[] = [
+  { id: 'harina', name: 'Harina de trigo', unit: 'kg', stock: 12, minimum: 3, cost: 5.5 },
+  { id: 'chocolate', name: 'Chocolate bitter', unit: 'kg', stock: 2, minimum: 1, cost: 32 },
+  { id: 'azucar', name: 'AzÃºcar rubia', unit: 'kg', stock: 8, minimum: 2, cost: 4.5 },
+  { id: 'huevo', name: 'Huevos', unit: 'unidad', stock: 48, minimum: 12, cost: 0.6 },
+  { id: 'pollo', name: 'Pechuga de pollo', unit: 'kg', stock: 5, minimum: 2, cost: 18 },
+  { id: 'arroz', name: 'Arroz', unit: 'kg', stock: 10, minimum: 3, cost: 4.8 },
+]
+
+export const DEMO_PRODUCTS: Product[] = [
+  {
+    id: 'torta',
+    name: 'Torta de chocolate',
+    category: 'Postres',
+    price: 65,
+    description: 'Torta casera, presentaciÃ³n de 8 porciones.',
+    recipe: [
+      { ingredientId: 'harina', quantity: 0.4 },
+      { ingredientId: 'chocolate', quantity: 0.5 },
+      { ingredientId: 'azucar', quantity: 0.3 },
+      { ingredientId: 'huevo', quantity: 4 },
+    ],
+  },
+  {
+    id: 'vianda',
+    name: 'Pollo con arroz',
+    category: 'Viandas',
+    price: 16,
+    description: 'Una porciÃ³n individual para el almuerzo.',
+    recipe: [
+      { ingredientId: 'pollo', quantity: 0.2 },
+      { ingredientId: 'arroz', quantity: 0.15 },
+    ],
+  },
+]
+
+=== ARCHIVO: src\domain\errors.ts
+/** Error de regla de negocio: su mensaje estÃ¡ pensado para mostrarse al usuario. */
+export class DomainError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'DomainError'
+  }
+}
+
+export function fail(message: string): never {
+  throw new DomainError(message)
+}
+
+=== ARCHIVO: src\domain\index.ts
+export * from './commands'
+export * from './constants'
+export * from './errors'
+export * from './inventory'
+export * from './orders'
+export * from './state'
+export type * from './types'
+
+=== ARCHIVO: src\domain\inventory.ts
+import { ACTIVE_ORDER_STATUSES } from './constants'
+import type { Ingredient, KitchenState, Order, QuantityMap, ShoppingItem } from './types'
+import { addQuantity, round } from './utils'
+
+/** Ingredientes totales que consume un pedido. */
+export function orderNeeds(order: Order): QuantityMap {
+  const result: QuantityMap = {}
+  for (const line of order.items)
+    for (const r of line.recipe) addQuantity(result, r.ingredientId, r.quantity * line.quantity)
+  return result
+}
+
+function sumNeeds(orders: Order[]): QuantityMap {
+  const result: QuantityMap = {}
+  for (const o of orders)
+    for (const [k, v] of Object.entries(orderNeeds(o))) addQuantity(result, k, v)
+  return result
+}
+
+/** Cantidades apartadas por pedidos confirmados (opcionalmente excluyendo uno). */
+export function reservedQuantities(state: KitchenState, exceptOrderId?: string): QuantityMap {
+  return sumNeeds(state.orders.filter((o) => o.status === 'Confirmado' && o.id !== exceptOrderId))
+}
+
+export function availableStock(ingredient: Ingredient, reserved: QuantityMap): number {
+  return round(ingredient.stock - (reserved[ingredient.id] ?? 0))
+}
+
+export function isLowStock(ingredient: Ingredient, reserved: QuantityMap): boolean {
+  return availableStock(ingredient, reserved) <= ingredient.minimum
+}
+
+export function lowStockIngredients(state: KitchenState): Ingredient[] {
+  const reserved = reservedQuantities(state)
+  return state.ingredients.filter((i) => isLowStock(i, reserved))
+}
+
+/**
+ * Lista de compras para los pedidos activos entre `from` y `to` (inclusive).
+ * El stock disponible descuenta lo reservado por pedidos confirmados fuera del rango.
+ */
+export function shoppingList(state: KitchenState, from = '', to = '9999'): ShoppingItem[] {
+  const inRange = (o: Order) => o.date >= from && o.date <= to
+  const required = sumNeeds(
+    state.orders.filter(
+      (o) => (ACTIVE_ORDER_STATUSES as readonly string[]).includes(o.status) && inRange(o),
+    ),
+  )
+  const reservedOutside = sumNeeds(
+    state.orders.filter((o) => o.status === 'Confirmado' && !inRange(o)),
+  )
+
+  return state.ingredients
+    .filter((i) => required[i.id])
+    .map((i) => {
+      const needed = required[i.id] ?? 0
+      const available = round(Math.max(0, i.stock - (reservedOutside[i.id] ?? 0)))
+      return { ...i, required: needed, available, buy: round(Math.max(0, needed - available)) }
+    })
+}
+
+=== ARCHIVO: src\domain\orders.ts
+import { ACTIVE_ORDER_STATUSES } from './constants'
+import type { Order } from './types'
+
+export const orderTotal = (order: Order) =>
+  order.items.reduce((sum, line) => sum + line.price * line.quantity, 0)
+
+export const orderUnits = (order: Order) =>
+  order.items.reduce((sum, line) => sum + line.quantity, 0)
+
+export const isActiveOrder = (order: Order) =>
+  (ACTIVE_ORDER_STATUSES as readonly string[]).includes(order.status)
+
+export const formatOrderNumber = (order: Order) => `#${String(order.number).padStart(3, '0')}`
+
+/** Siguiente estado "positivo" del flujo (confirmar â†’ entregar). */
+export function nextOrderStatus(order: Order) {
+  if (order.status === 'Pendiente') return 'Confirmado' as const
+  if (order.status === 'Confirmado') return 'Entregado' as const
+  return null
+}
+
+=== ARCHIVO: src\domain\state.ts
+import type { KitchenState } from './types'
+
+export const createInitialState = (): KitchenState => ({
+  products: [],
+  ingredients: [],
+  orders: [],
+  movements: [],
+})
+
+=== ARCHIVO: src\domain\types.ts
+import type {
+  ORDER_CHANNELS,
+  ORDER_STATUSES,
+  PRODUCT_CATEGORIES,
+  ROLES,
+  STOCK_MOVEMENT_KINDS,
+  UNITS,
+} from './constants'
+
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number]
+export type Unit = (typeof UNITS)[number]
+export type OrderChannel = (typeof ORDER_CHANNELS)[number]
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
+export type StockMovementKind = (typeof STOCK_MOVEMENT_KINDS)[number]
+export type Role = (typeof ROLES)[number]
+
+/** Fecha en formato ISO `YYYY-MM-DD`. */
+export type IsoDate = string
+/** Mapa ingrediente â†’ cantidad. */
+export type QuantityMap = Record<string, number>
+
+export interface RecipeLine {
+  ingredientId: string
+  quantity: number
+}
+
+export interface Product {
+  id: string
+  name: string
+  category: ProductCategory
+  price: number
+  description: string
+  recipe: RecipeLine[]
+}
+
+export interface Ingredient {
+  id: string
+  name: string
+  unit: Unit
+  stock: number
+  minimum: number
+  cost: number
+}
+
+/** LÃ­nea de pedido: guarda una copia del precio y la receta al momento del pedido. */
+export interface OrderItem {
+  productId: string
+  name: string
+  price: number
+  quantity: number
+  recipe: RecipeLine[]
+}
+
+export interface Order {
+  id: string
+  number: number
+  customer: string
+  date: IsoDate
+  channel: OrderChannel
+  notes: string
+  items: OrderItem[]
+  status: OrderStatus
+  created: string
+}
+
+export interface StockMovement {
+  id: string
+  date: string
+  ingredient: string
+  quantity: number
+  unit: Unit
+  note: string
+}
+
+export interface KitchenState {
+  products: Product[]
+  ingredients: Ingredient[]
+  orders: Order[]
+  movements: StockMovement[]
+}
+
+export interface ShoppingItem extends Ingredient {
+  required: number
+  available: number
+  buy: number
+}
+
+=== ARCHIVO: src\domain\utils.ts
+/** Redondea a 6 decimales para evitar errores de coma flotante en cantidades. */
+export const round = (n: number) => Math.round(n * 1_000_000) / 1_000_000
+
+export function createId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) =>
+    x.toString(16).padStart(2, '0'),
+  ).join('')
+}
+
+export function addQuantity(map: Record<string, number>, key: string, value: number) {
+  map[key] = round((map[key] ?? 0) + value)
+}
+
+=== ARCHIVO: src\domain\validators.ts
+import { LIMITS } from './constants'
+import { fail } from './errors'
+
+/** Valor numÃ©rico tal como llega de un formulario. */
+export type NumericInput = string | number
+
+export function requireText(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !value.trim() || value.length > LIMITS.text)
+    fail(`${label} es obligatorio (mÃ¡ximo ${LIMITS.text} caracteres).`)
+  return value.trim()
+}
+
+export function optionalText(value: unknown, max: number = LIMITS.longText): string {
+  return String(value ?? '').slice(0, max)
+}
+
+export function requireNumber(value: unknown, label: string, min = 0): number {
+  const n = Number(value)
+  if (
+    value === '' ||
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(n) ||
+    n < min ||
+    n > LIMITS.maxNumber
+  )
+    fail(`${label} no es vÃ¡lido.`)
+  return n
+}
+
+export function requireOneOf<T extends string>(
+  value: unknown,
+  options: readonly T[],
+  message: string,
+): T {
+  if (!options.includes(value as T)) fail(message)
+  return value as T
+}
+
+export function isValidIsoDate(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    new Date(value).toISOString().slice(0, 10) === value
+  )
+}
+
+=== ARCHIVO: src\features\auth\components\LoginForm.tsx
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useNavigate } from 'react-router'
+import { ROUTES } from '@/app/navigation'
+import { Brand } from '@/components/layout'
+import { Button, FormError, Input } from '@/components/ui'
+import { errorMessage } from '@/lib/errors'
+import { useAuthStore } from '@/stores/auth.store'
+
+interface LoginValues {
+  username: string
+  password: string
+}
+
+export function LoginForm() {
+  const login = useAuthStore((s) => s.login)
+  const navigate = useNavigate()
+  const [error, setError] = useState<string | null>(null)
+  const { register, handleSubmit, formState } = useForm<LoginValues>()
+
+  const onSubmit = handleSubmit(async ({ username, password }) => {
+    setError(null)
+    try {
+      await login(username, password)
+      navigate(ROUTES.dashboard, { replace: true })
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  })
+
+  return (
+    <form onSubmit={onSubmit} className="w-full max-w-[340px]">
+      <Brand />
+      <h2>Bienvenido a tu cocina</h2>
+      <p className="leading-relaxed text-muted">Ingresa para organizar tu dÃ­a.</p>
+      <label className="my-5 block">
+        Usuario
+        <Input
+          className="mt-2"
+          required
+          autoComplete="username"
+          autoFocus
+          {...register('username')}
+        />
+      </label>
+      <label className="my-5 block">
+        ContraseÃ±a
+        <Input
+          className="mt-2"
+          type="password"
+          required
+          autoComplete="current-password"
+          {...register('password')}
+        />
+      </label>
+      <Button type="submit" variant="primary" className="w-full" disabled={formState.isSubmitting}>
+        Iniciar sesiÃ³n â†’
+      </Button>
+      <FormError message={error} />
+    </form>
+  )
+}
+
+=== ARCHIVO: src\features\auth\index.ts
+export { LoginPage } from './LoginPage'
+
+=== ARCHIVO: src\features\auth\LoginPage.tsx
+import { HeroArt } from '@/components/icons/HeroArt'
+import { Eyebrow } from '@/components/layout'
+import { LoginForm } from './components/LoginForm'
+
+export function LoginPage() {
+  return (
+    <div className="grid min-h-screen md:grid-cols-2">
+      <section className="hidden flex-col justify-center bg-brand p-[70px] text-[#f4f0df] md:flex">
+        <Eyebrow className="text-[#c8d5b8]">Sabores de Barbarita Â· Surquillo</Eyebrow>
+        <h1 className="my-[35px] font-serif text-[55px] leading-[1.2] font-normal tracking-normal">
+          Tu cocina,
+          <br />
+          mejor organizada.
+        </h1>
+        <p className="leading-[1.8] text-[#c1d0bf]">
+          Cada pedido en su lugar.
+          <br />
+          Cada ingrediente, justo a tiempo.
+        </p>
+        <HeroArt className="h-[120px] w-[200px] shrink-0" />
+      </section>
+      <section className="grid place-items-center p-[35px]">
+        <LoginForm />
+      </section>
+    </div>
+  )
+}
+
+=== ARCHIVO: src\features\calendar\components\DayColumn.tsx
+import { formatOrderNumber, orderUnits, type IsoDate, type Order } from '@/domain'
+import { formatWeekday } from '@/lib/format'
+
+interface DayColumnProps {
+  date: IsoDate
+  orders: Order[]
+  onSelect: (order: Order) => void
+}
+
+export function DayColumn({ date, orders, onSelect }: DayColumnProps) {
+  return (
+    <div className="min-h-[220px] rounded-[9px] border border-line bg-white p-3.5">
+      <div className="mb-[18px] text-[11px] text-muted uppercase">
+        {formatWeekday(date)}
+        <strong className="mt-2 block text-2xl text-ink">{date.slice(-2)}</strong>
+      </div>
+      {orders.length ? (
+        orders.map((order) => (
+          <button
+            key={order.id}
+            type="button"
+            onClick={() => onSelect(order)}
+            className="mb-2 w-full rounded-[7px] bg-sage-100 p-2.5 text-left text-[11px] leading-normal hover:brightness-[.97]"
+          >
+            <strong className="block">{order.customer}</strong>
+            {formatOrderNumber(order)} Â· {orderUnits(order)} productos
+            <br />
+            {order.status}
+          </button>
+        ))
+      ) : (
+        <span className="text-[11px] text-muted">Sin entregas</span>
+      )}
+    </div>
+  )
+}
+
+=== ARCHIVO: src\features\calendar\CalendarPage.tsx
+import { useMemo, useState } from 'react'
+import { PageHeader, WeekToolbar } from '@/components/layout'
+import type { IsoDate, Order } from '@/domain'
+import { OrderDetailDialog } from '@/features/orders'
+import { weekDays } from '@/lib/dates'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { useWeekStore } from '@/stores/week.store'
+import { DayColumn } from './components/DayColumn'
+
+export function CalendarPage() {
+  const { orders } = useKitchenData()
+  const start = useWeekStore((s) => s.start)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const days = useMemo(() => weekDays(start), [start])
+
+  const ordersByDay = useMemo(() => {
+    const map = new Map<IsoDate, Order[]>()
+    for (const o of orders) {
+      if (o.status === 'Cancelado') continue
+      map.set(o.date, [...(map.get(o.date) ?? []), o])
+    }
+    return map
+  }, [orders])
+
+  return (
+    <>
+      <PageHeader title="Calendario de entregas" subtitle="Revisa los pedidos de cada dÃ­a." />
+      <WeekToolbar />
+      <div className="overflow-auto">
+        <div className="grid min-w-[900px] grid-cols-[repeat(7,minmax(120px,1fr))] gap-2.5">
+          {days.map((day) => (
+            <DayColumn
+              key={day}
+              date={day}
+              orders={ordersByDay.get(day) ?? []}
+              onSelect={(o) => setSelectedId(o.id)}
+            />
+          ))}
+        </div>
+      </div>
+      <OrderDetailDialog orderId={selectedId} onClose={() => setSelectedId(null)} />
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\calendar\index.ts
+export { CalendarPage } from './CalendarPage'
+
+=== ARCHIVO: src\features\dashboard\components\GettingStarted.tsx
+import { Link } from 'react-router'
+import { ROUTES } from '@/app/navigation'
+import { Button, Notice } from '@/components/ui'
+import { useCommand } from '@/hooks/useCommand'
+
+/** Aviso para una base vacÃ­a: guÃ­a al dueÃ±o a registrar datos o cargar ejemplos. */
+export function GettingStarted() {
+  const { run, error, pending } = useCommand()
+
+  return (
+    <Notice>
+      Para comenzar,{' '}
+      <Link to={ROUTES.ingredients} className="font-semibold text-link hover:underline">
+        registra tus insumos
+      </Link>{' '}
+      y luego agrega tus productos. Â¿Quieres probar primero?{' '}
+      <Button
+        variant="link"
+        disabled={pending}
+        onClick={() => void run({ type: 'demo/load' }, 'Datos de ejemplo cargados')}
+      >
+        Cargar datos de ejemplo
+      </Button>
+      {error && <span className="block text-error">{error}</span>}
+    </Notice>
+  )
+}
+
+=== ARCHIVO: src\features\dashboard\components\LowStockPanel.tsx
+import { useMemo } from 'react'
+import { Link } from 'react-router'
+import { ROUTES } from '@/app/navigation'
+import { Badge, EmptyState, ListRow, Panel, PanelHeader } from '@/components/ui'
+import { availableStock, reservedQuantities, type Ingredient } from '@/domain'
+import { formatQuantity } from '@/lib/format'
+import { useKitchenData } from '@/stores/kitchen.store'
+
+const MAX_ITEMS = 5
+
+export function LowStockPanel({ items }: { items: Ingredient[] }) {
+  const state = useKitchenData()
+  const reserved = useMemo(() => reservedQuantities(state), [state])
+
+  return (
+    <Panel>
+      <PanelHeader title="Insumos por reponer">
+        <Badge tone="warn">{items.length} avisos</Badge>
+      </PanelHeader>
+      {items.length ? (
+        items.slice(0, MAX_ITEMS).map((i) => (
+          <ListRow
+            key={i.id}
+            title={
+              <>
+                <span className="mr-2 inline-block size-[9px] rounded-full bg-[#d9a256]" />
+                {i.name}
+              </>
+            }
+            subtitle={`MÃ­nimo: ${formatQuantity(i.minimum)} ${i.unit}`}
+            aside={
+              <span>
+                {formatQuantity(availableStock(i, reserved))} {i.unit}
+              </span>
+            }
+          />
+        ))
+      ) : (
+        <EmptyState title="Sin alertas de stock">Tu inventario se mostrarÃ¡ aquÃ­.</EmptyState>
+      )}
+      <Link
+        to={ROUTES.ingredients}
+        className="mt-5 inline-block text-xs font-semibold text-link hover:underline"
+      >
+        Revisar inventario â†’
+      </Link>
+    </Panel>
+  )
+}
+
+=== ARCHIVO: src\features\dashboard\DashboardPage.tsx
+import { useMemo } from 'react'
+import { Link } from 'react-router'
+import { ROUTES } from '@/app/navigation'
+import { PageHeader } from '@/components/layout'
+import { Panel, PanelHeader, StatCard, StatGrid } from '@/components/ui'
+import { isActiveOrder, lowStockIngredients, orderTotal } from '@/domain'
+import { NewOrderButton, OrdersTable } from '@/features/orders'
+import { todayIso } from '@/lib/dates'
+import { formatMoney } from '@/lib/format'
+import { useIsOwner } from '@/stores/auth.store'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { GettingStarted } from './components/GettingStarted'
+import { LowStockPanel } from './components/LowStockPanel'
+
+const UPCOMING_LIMIT = 5
+
+export function DashboardPage() {
+  const state = useKitchenData()
+  const isOwner = useIsOwner()
+
+  const { active, upcoming, lowStock, todayCount, activeTotal } = useMemo(() => {
+    const today = todayIso()
+    const active = state.orders.filter(isActiveOrder)
+    return {
+      active,
+      upcoming: [...active].sort((a, b) => a.date.localeCompare(b.date)).slice(0, UPCOMING_LIMIT),
+      lowStock: lowStockIngredients(state),
+      todayCount: active.filter((o) => o.date === today).length,
+      activeTotal: active.reduce((sum, o) => sum + orderTotal(o), 0),
+    }
+  }, [state])
+
+  const isEmpty = !state.products.length && !state.ingredients.length
+
+  return (
+    <>
+      <PageHeader
+        title="Resumen del negocio"
+        subtitle="Revisa tus pedidos y lo que falta comprar."
+        action={<NewOrderButton />}
+      />
+      <StatGrid>
+        <StatCard
+          label="Pedidos pendientes"
+          value={active.length}
+          hint="Por preparar y entregar"
+          icon="orders"
+        />
+        <StatCard
+          label="Entregas de hoy"
+          value={todayCount}
+          hint="Agenda del dÃ­a"
+          icon="calendar"
+        />
+        <StatCard
+          label="Stock por revisar"
+          value={lowStock.length}
+          hint="Insumos en el mÃ­nimo o menos"
+          icon="ingredients"
+        />
+        <StatCard
+          label="Total de pedidos activos"
+          value={formatMoney(activeTotal)}
+          hint="Pedidos pendientes y confirmados"
+          icon="shopping"
+        />
+      </StatGrid>
+      <div className="grid grid-cols-1 gap-[22px] xl:grid-cols-[minmax(0,1.7fr)_minmax(270px,1fr)]">
+        <Panel>
+          <PanelHeader title="PrÃ³ximos pedidos">
+            <Link to={ROUTES.orders} className="text-xs font-semibold text-link hover:underline">
+              Ver todos â†’
+            </Link>
+          </PanelHeader>
+          <OrdersTable orders={upcoming} />
+        </Panel>
+        <LowStockPanel items={lowStock} />
+      </div>
+      {isOwner && isEmpty && <GettingStarted />}
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\dashboard\index.ts
+export { DashboardPage } from './DashboardPage'
+
+=== ARCHIVO: src\features\ingredients\components\IngredientFormDialog.tsx
+import { useForm } from 'react-hook-form'
+import {
+  Button,
+  Field,
+  FormActions,
+  FormError,
+  FormGrid,
+  Input,
+  Modal,
+  Notice,
+  Select,
+} from '@/components/ui'
+import { LIMITS, UNITS, type IngredientInput } from '@/domain'
+import { useCommand } from '@/hooks/useCommand'
+
+export function IngredientFormDialog({ onClose }: { onClose: () => void }) {
+  const { run, error, pending } = useCommand()
+  const { register, handleSubmit } = useForm<IngredientInput>({
+    defaultValues: { name: '', unit: UNITS[0], stock: 0, minimum: 0, cost: 0 },
+  })
+
+  const onSubmit = handleSubmit(async (values) => {
+    if (await run({ type: 'ingredient/create', payload: values })) onClose()
+  })
+
+  return (
+    <Modal open title="Nuevo insumo" onClose={onClose}>
+      <form onSubmit={onSubmit} className="mt-4">
+        <FormGrid>
+          <Field label="Nombre *">
+            <Input required maxLength={LIMITS.text} {...register('name')} />
+          </Field>
+          <Field label="Unidad base *">
+            <Select {...register('unit')}>
+              {UNITS.map((u) => (
+                <option key={u}>{u}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Cantidad inicial *">
+            <Input type="number" required min={0} step={0.001} {...register('stock')} />
+          </Field>
+          <Field label="Cantidad mÃ­nima *">
+            <Input type="number" required min={0} step={0.001} {...register('minimum')} />
+          </Field>
+          <Field label="Costo por unidad (S/) *">
+            <Input type="number" required min={0} step={0.01} {...register('cost')} />
+          </Field>
+        </FormGrid>
+        <Notice>Usa la misma unidad al definir recetas. Ejemplo: 500 g = 0.5 kg.</Notice>
+        <FormError message={error} />
+        <FormActions>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={pending}>
+            Guardar
+          </Button>
+        </FormActions>
+      </form>
+    </Modal>
+  )
+}
+
+=== ARCHIVO: src\features\ingredients\components\IngredientsTable.tsx
+import { useMemo } from 'react'
+import { Badge, Button, EmptyState, Table, Td, Th, Tr } from '@/components/ui'
+import { availableStock, reservedQuantities, type Ingredient } from '@/domain'
+import { formatMoney, formatQuantity } from '@/lib/format'
+import { useKitchenData } from '@/stores/kitchen.store'
+
+interface IngredientsTableProps {
+  /** Si se pasa, se muestra la acciÃ³n para registrar movimientos. */
+  onUpdateStock?: (ingredient: Ingredient) => void
+}
+
+export function IngredientsTable({ onUpdateStock }: IngredientsTableProps) {
+  const state = useKitchenData()
+  const reserved = useMemo(() => reservedQuantities(state), [state])
+
+  return (
+    <>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Insumo</Th>
+            <Th>En almacÃ©n</Th>
+            <Th>Reservado</Th>
+            <Th>Disponible</Th>
+            <Th>MÃ­nimo</Th>
+            <Th>Precio por unidad</Th>
+            <Th>
+              <span className="sr-only">Acciones</span>
+            </Th>
+          </tr>
+        </thead>
+        <tbody>
+          {state.ingredients.map((i) => {
+            const available = availableStock(i, reserved)
+            return (
+              <Tr key={i.id}>
+                <Td>
+                  <strong>{i.name}</strong>
+                </Td>
+                <Td>
+                  {formatQuantity(i.stock)} {i.unit}
+                </Td>
+                <Td>{formatQuantity(reserved[i.id] ?? 0)}</Td>
+                <Td>
+                  <Badge tone={available <= i.minimum ? 'warn' : 'neutral'}>
+                    {formatQuantity(available)} {i.unit}
+                  </Badge>
+                </Td>
+                <Td>{formatQuantity(i.minimum)}</Td>
+                <Td>{formatMoney(i.cost)}</Td>
+                <Td>
+                  {onUpdateStock && (
+                    <Button variant="link" onClick={() => onUpdateStock(i)}>
+                      Actualizar cantidad
+                    </Button>
+                  )}
+                </Td>
+              </Tr>
+            )
+          })}
+        </tbody>
+      </Table>
+      {!state.ingredients.length && (
+        <EmptyState>AÃºn no hay insumos. Registra el primero para crear recetas.</EmptyState>
+      )}
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\ingredients\components\MovementsList.tsx
+import { EmptyState, ListRow } from '@/components/ui'
+import { formatDateTime, formatQuantity } from '@/lib/format'
+import { useKitchenData } from '@/stores/kitchen.store'
+
+const MAX_MOVEMENTS = 15
+
+export function MovementsList() {
+  const { movements } = useKitchenData()
+  const recent = movements.slice(-MAX_MOVEMENTS).reverse()
+
+  if (!recent.length) return <EmptyState>Los ingresos y consumos aparecerÃ¡n aquÃ­.</EmptyState>
+
+  return recent.map((m) => (
+    <ListRow
+      key={m.id}
+      title={m.ingredient}
+      subtitle={`${m.note} Â· ${formatDateTime(m.date)}`}
+      aside={
+        <span>
+          {m.quantity > 0 ? '+' : ''}
+          {formatQuantity(m.quantity)} {m.unit}
+        </span>
+      }
+    />
+  ))
+}
+
+=== ARCHIVO: src\features\ingredients\components\StockMovementDialog.tsx
+import { useForm } from 'react-hook-form'
+import {
+  Button,
+  Field,
+  FormActions,
+  FormError,
+  FormGrid,
+  Input,
+  Modal,
+  Select,
+} from '@/components/ui'
+import { LIMITS, type Ingredient, type StockMovementInput } from '@/domain'
+import { useCommand } from '@/hooks/useCommand'
+
+interface StockMovementDialogProps {
+  ingredient: Ingredient
+  onClose: () => void
+}
+
+type StockValues = Omit<StockMovementInput, 'id'>
+
+export function StockMovementDialog({ ingredient, onClose }: StockMovementDialogProps) {
+  const { run, error, pending } = useCommand()
+  const { register, handleSubmit } = useForm<StockValues>({
+    defaultValues: { kind: 'entrada', quantity: '', note: '' },
+  })
+
+  const onSubmit = handleSubmit(async (values) => {
+    if (await run({ type: 'stock/move', payload: { ...values, id: ingredient.id } })) onClose()
+  })
+
+  return (
+    <Modal open title={`Movimiento Â· ${ingredient.name}`} onClose={onClose}>
+      <form onSubmit={onSubmit} className="mt-4">
+        <FormGrid>
+          <Field label="Movimiento">
+            <Select {...register('kind')}>
+              <option value="entrada">Entrada / compra</option>
+              <option value="salida">Salida / merma</option>
+            </Select>
+          </Field>
+          <Field label={`Cantidad en ${ingredient.unit}`}>
+            <Input type="number" required min={0.001} step={0.001} {...register('quantity')} />
+          </Field>
+          <Field label="Motivo *" className="sm:col-span-2">
+            <Input
+              required
+              maxLength={LIMITS.text}
+              placeholder="Compra semanal, mermaâ€¦"
+              {...register('note')}
+            />
+          </Field>
+        </FormGrid>
+        <FormError message={error} />
+        <FormActions>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={pending}>
+            Guardar
+          </Button>
+        </FormActions>
+      </form>
+    </Modal>
+  )
+}
+
+=== ARCHIVO: src\features\ingredients\index.ts
+export { IngredientsPage } from './IngredientsPage'
+
+=== ARCHIVO: src\features\ingredients\IngredientsPage.tsx
+import { useState } from 'react'
+import { PageHeader } from '@/components/layout'
+import { Button, Panel } from '@/components/ui'
+import { useIsOwner } from '@/stores/auth.store'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { IngredientFormDialog } from './components/IngredientFormDialog'
+import { IngredientsTable } from './components/IngredientsTable'
+import { MovementsList } from './components/MovementsList'
+import { StockMovementDialog } from './components/StockMovementDialog'
+
+type DialogState = { kind: 'create' } | { kind: 'stock'; ingredientId: string } | null
+
+export function IngredientsPage() {
+  const { ingredients } = useKitchenData()
+  const isOwner = useIsOwner()
+  const [dialog, setDialog] = useState<DialogState>(null)
+  const close = () => setDialog(null)
+
+  const stockIngredient =
+    dialog?.kind === 'stock' ? ingredients.find((i) => i.id === dialog.ingredientId) : undefined
+
+  return (
+    <>
+      <PageHeader
+        title="Insumos"
+        subtitle="Revisa tus ingredientes y registra las compras."
+        action={
+          isOwner && (
+            <Button
+              variant="primary"
+              className="text-xs whitespace-nowrap md:text-sm"
+              onClick={() => setDialog({ kind: 'create' })}
+            >
+              ï¼‹ Nuevo insumo
+            </Button>
+          )
+        }
+      />
+      <Panel>
+        <IngredientsTable
+          onUpdateStock={
+            isOwner ? (i) => setDialog({ kind: 'stock', ingredientId: i.id }) : undefined
+          }
+        />
+      </Panel>
+      <Panel>
+        <h2>Ãšltimos movimientos</h2>
+        <MovementsList />
+      </Panel>
+
+      {dialog?.kind === 'create' && <IngredientFormDialog onClose={close} />}
+      {stockIngredient && <StockMovementDialog ingredient={stockIngredient} onClose={close} />}
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\orders\components\NewOrderButton.tsx
+import { useState } from 'react'
+import { Button } from '@/components/ui'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { toast } from '@/stores/toast.store'
+import { OrderFormDialog } from './OrderFormDialog'
+
+/** BotÃ³n "Nuevo pedido" con su formulario; reutilizable en cualquier pÃ¡gina. */
+export function NewOrderButton() {
+  const { products } = useKitchenData()
+  const [open, setOpen] = useState(false)
+
+  const handleClick = () => {
+    if (!products.some((p) => p.recipe.length))
+      return toast('Primero registra un producto y define su receta.')
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        className="text-xs whitespace-nowrap md:text-sm"
+        onClick={handleClick}
+      >
+        ï¼‹ Nuevo pedido
+      </Button>
+      <OrderFormDialog open={open} onClose={() => setOpen(false)} />
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\orders\components\OrderDetailDialog.tsx
+import {
+  Button,
+  FormActions,
+  FormError,
+  ListRow,
+  Modal,
+  Notice,
+  StatusBadge,
+} from '@/components/ui'
+import {
+  formatOrderNumber,
+  nextOrderStatus,
+  orderTotal,
+  type Order,
+  type OrderStatus,
+} from '@/domain'
+import { useCommand } from '@/hooks/useCommand'
+import { formatMoney, formatShortDate } from '@/lib/format'
+import { useKitchenData } from '@/stores/kitchen.store'
+
+interface OrderDetailDialogProps {
+  orderId: string | null
+  onClose: () => void
+}
+
+const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
+  Confirmado: 'Confirmar y reservar',
+  Entregado: 'Marcar entregado',
+}
+
+export function OrderDetailDialog({ orderId, onClose }: OrderDetailDialogProps) {
+  const { orders } = useKitchenData()
+  const order = orders.find((o) => o.id === orderId)
+  // Al cerrarse se desmonta el contenido, asÃ­ el error de un intento previo no reaparece.
+  if (!order) return null
+  return <OrderDetail order={order} onClose={onClose} />
+}
+
+function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) {
+  const { run, error, pending } = useCommand()
+  const next = nextOrderStatus(order)
+
+  const changeStatus = async (status: OrderStatus) => {
+    if (status === 'Cancelado' && !confirm('Â¿Cancelar este pedido y liberar sus reservas?')) return
+    if (await run({ type: 'order/changeStatus', payload: { id: order.id, status } })) onClose()
+  }
+
+  return (
+    <Modal open title={`Pedido ${formatOrderNumber(order)}`} onClose={onClose}>
+      <h3 className="mt-4">{order.customer}</h3>
+      <p className="flex items-center gap-1.5 leading-relaxed text-muted">
+        {formatShortDate(order.date)} Â· {order.channel} Â· <StatusBadge status={order.status} />
+      </p>
+      {order.items.map((line, i) => (
+        <ListRow
+          key={i}
+          title={
+            <span className="font-normal">
+              {line.quantity} Ã— {line.name}
+            </span>
+          }
+          aside={<strong>{formatMoney(line.price * line.quantity)}</strong>}
+        />
+      ))}
+      <ListRow title="Total" aside={<strong>{formatMoney(orderTotal(order))}</strong>} />
+      {order.notes && <Notice>{order.notes}</Notice>}
+      <FormError message={error} />
+      <FormActions>
+        {next ? (
+          <>
+            <Button variant="danger" disabled={pending} onClick={() => changeStatus('Cancelado')}>
+              Cancelar pedido
+            </Button>
+            <Button variant="primary" disabled={pending} onClick={() => changeStatus(next)}>
+              {NEXT_LABEL[next]}
+            </Button>
+          </>
+        ) : (
+          <Button onClick={onClose}>Cerrar</Button>
+        )}
+      </FormActions>
+    </Modal>
+  )
+}
+
+=== ARCHIVO: src\features\orders\components\OrderFormDialog.tsx
+import { useMemo } from 'react'
+import { useFieldArray, useForm } from 'react-hook-form'
+import {
+  Button,
+  Field,
+  FormActions,
+  FormError,
+  FormGrid,
+  Input,
+  Modal,
+  Notice,
+  Select,
+  Textarea,
+} from '@/components/ui'
+import { LIMITS, ORDER_CHANNELS, type OrderInput } from '@/domain'
+import { useCommand } from '@/hooks/useCommand'
+import { todayIso } from '@/lib/dates'
+import { formatMoney } from '@/lib/format'
+import { useKitchenData } from '@/stores/kitchen.store'
+
+interface OrderFormDialogProps {
+  open: boolean
+  onClose: () => void
+}
+
+export function OrderFormDialog({ open, onClose }: OrderFormDialogProps) {
+  return (
+    <Modal open={open} title="Nuevo pedido" onClose={onClose}>
+      {open && <OrderForm onDone={onClose} />}
+    </Modal>
+  )
+}
+
+function OrderForm({ onDone }: { onDone: () => void }) {
+  const { products } = useKitchenData()
+  const orderable = useMemo(() => products.filter((p) => p.recipe.length), [products])
+  const { run, error, pending } = useCommand()
+
+  const { register, control, handleSubmit } = useForm<OrderInput>({
+    defaultValues: {
+      customer: '',
+      date: todayIso(),
+      channel: ORDER_CHANNELS[0],
+      notes: '',
+      items: [{ productId: orderable[0]?.id ?? '', quantity: 1 }],
+    },
+  })
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  const onSubmit = handleSubmit(async (values) => {
+    if (await run({ type: 'order/create', payload: values })) onDone()
+  })
+
+  return (
+    <form onSubmit={onSubmit}>
+      <FormGrid>
+        <Field label="Nombre del cliente *">
+          <Input required maxLength={LIMITS.text} {...register('customer')} />
+        </Field>
+        <Field label="Fecha de entrega *">
+          <Input type="date" required {...register('date')} />
+        </Field>
+        <Field label="Canal">
+          <Select {...register('channel')}>
+            {ORDER_CHANNELS.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </Select>
+        </Field>
+      </FormGrid>
+
+      <h3 className="mt-[22px]">Productos</h3>
+      {fields.map((field, index) => (
+        <div
+          key={field.id}
+          className="my-2.5 grid grid-cols-[1fr_80px_30px] gap-[9px] sm:grid-cols-[1fr_100px_32px]"
+        >
+          <Select aria-label="Producto" required {...register(`items.${index}.productId`)}>
+            {orderable.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} Â· {formatMoney(p.price)}
+              </option>
+            ))}
+          </Select>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            required
+            aria-label="Cantidad de productos"
+            {...register(`items.${index}.quantity`)}
+          />
+          <Button className="p-1" aria-label="Quitar producto" onClick={() => remove(index)}>
+            Ã—
+          </Button>
+        </div>
+      ))}
+      <Button onClick={() => append({ productId: orderable[0]?.id ?? '', quantity: 1 })}>
+        ï¼‹ Agregar producto
+      </Button>
+
+      <Field label="Notas" className="mt-5">
+        <Textarea maxLength={LIMITS.longText} {...register('notes')} />
+      </Field>
+      <Notice>
+        El pedido se registra como pendiente. Al confirmarlo se validan y reservan los insumos
+        disponibles.
+      </Notice>
+      <FormError message={error} />
+      <FormActions>
+        <Button onClick={onDone}>Cancelar</Button>
+        <Button type="submit" variant="primary" disabled={pending}>
+          Registrar pedido
+        </Button>
+      </FormActions>
+    </form>
+  )
+}
+
+=== ARCHIVO: src\features\orders\components\OrdersTable.tsx
+import { StatusBadge, Button, EmptyState, Table, Td, Th, Tr } from '@/components/ui'
+import { formatOrderNumber, orderTotal, type Order } from '@/domain'
+import { formatMoney, formatShortDate } from '@/lib/format'
+
+interface OrdersTableProps {
+  orders: Order[]
+  /** Si se pasa, se muestra la columna de acciones. */
+  onSelect?: (order: Order) => void
+}
+
+export function OrdersTable({ orders, onSelect }: OrdersTableProps) {
+  if (!orders.length)
+    return (
+      <EmptyState title="Todo listo para tu primer pedido">
+        Registra productos y sus recetas para empezar.
+      </EmptyState>
+    )
+
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <Th>Pedido / cliente</Th>
+          <Th>Entrega</Th>
+          <Th>Importe</Th>
+          <Th>Estado</Th>
+          {onSelect && <Th>Acciones</Th>}
+        </tr>
+      </thead>
+      <tbody>
+        {orders.map((order) => (
+          <Tr key={order.id}>
+            <Td>
+              <strong>
+                {formatOrderNumber(order)} Â· {order.customer}
+              </strong>
+              <div className="text-[11px] leading-relaxed text-muted">
+                {order.items.map((l) => `${l.quantity} Ã— ${l.name}`).join(', ')}
+              </div>
+            </Td>
+            <Td>{formatShortDate(order.date)}</Td>
+            <Td>{formatMoney(orderTotal(order))}</Td>
+            <Td>
+              <StatusBadge status={order.status} />
+            </Td>
+            {onSelect && (
+              <Td>
+                <Button variant="link" onClick={() => onSelect(order)}>
+                  Ver detalle
+                </Button>
+              </Td>
+            )}
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
+  )
+}
+
+=== ARCHIVO: src\features\orders\index.ts
+export { NewOrderButton } from './components/NewOrderButton'
+export { OrderDetailDialog } from './components/OrderDetailDialog'
+export { OrdersTable } from './components/OrdersTable'
+export { OrdersPage } from './OrdersPage'
+
+=== ARCHIVO: src\features\orders\OrdersPage.tsx
+import { useMemo, useState } from 'react'
+import { PageHeader } from '@/components/layout'
+import { Button, Footnote, Panel } from '@/components/ui'
+import { ORDER_STATUSES, type OrderStatus } from '@/domain'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { NewOrderButton } from './components/NewOrderButton'
+import { OrderDetailDialog } from './components/OrderDetailDialog'
+import { OrdersTable } from './components/OrdersTable'
+
+type Filter = 'Todos' | OrderStatus
+const FILTERS: Filter[] = ['Todos', ...ORDER_STATUSES]
+
+export function OrdersPage() {
+  const { orders } = useKitchenData()
+  const [filter, setFilter] = useState<Filter>('Todos')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const visible = useMemo(
+    () => orders.filter((o) => filter === 'Todos' || o.status === filter).reverse(),
+    [orders, filter],
+  )
+
+  return (
+    <>
+      <PageHeader
+        title="Pedidos"
+        subtitle="Registra y revisa los pedidos de tus clientes."
+        action={<NewOrderButton />}
+      />
+      <div
+        className="mb-[22px] flex flex-wrap items-center gap-3"
+        role="group"
+        aria-label="Filtrar por estado"
+      >
+        {FILTERS.map((f) => (
+          <Button
+            key={f}
+            variant={filter === f ? 'secondary' : 'default'}
+            aria-pressed={filter === f}
+            onClick={() => setFilter(f)}
+          >
+            {f}
+          </Button>
+        ))}
+      </div>
+      <Panel>
+        <OrdersTable orders={visible} onSelect={(o) => setSelectedId(o.id)} />
+      </Panel>
+      <Footnote>
+        Al confirmar un pedido se apartan sus ingredientes. Al entregarlo se descuentan del almacÃ©n.
+      </Footnote>
+      <OrderDetailDialog orderId={selectedId} onClose={() => setSelectedId(null)} />
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\products\components\ProductCard.tsx
+import { Badge, Button } from '@/components/ui'
+import type { Product } from '@/domain'
+import { cn } from '@/lib/cn'
+import { formatMoney } from '@/lib/format'
+import { CATEGORY_STYLE } from '../constants'
+
+interface ProductCardProps {
+  product: Product
+  canEdit: boolean
+  onOpenRecipe: () => void
+  onEdit: () => void
+}
+
+export function ProductCard({ product, canEdit, onOpenRecipe, onEdit }: ProductCardProps) {
+  const style = CATEGORY_STYLE[product.category]
+  const ingredients = product.recipe.length
+
+  return (
+    <article className="overflow-hidden rounded-[13px] border border-line bg-white">
+      <div
+        className={cn(
+          'relative flex h-[120px] items-center justify-center text-[50px]',
+          style.background,
+        )}
+      >
+        <Badge tone="glass" className="absolute top-3.5 left-[15px]">
+          {product.category}
+        </Badge>
+        <span aria-hidden="true">{style.emoji}</span>
+      </div>
+      <div className="p-[21px]">
+        <h3 className="mb-[7px]">{product.name}</h3>
+        <p className="min-h-[37px] text-xs leading-relaxed text-muted">
+          {product.description || 'Preparado con el sabor de casa.'}
+        </p>
+        <div className="flex items-center justify-between border-t border-line pt-4">
+          <span className="text-[19px] font-bold">{formatMoney(product.price)}</span>
+          <Badge tone={ingredients ? 'neutral' : 'warn'}>
+            {ingredients ? `${ingredients} ingredientes` : 'Sin receta'}
+          </Badge>
+        </div>
+        <div className="mt-[17px] flex gap-[7px]">
+          <Button className="flex-1 text-xs" onClick={onOpenRecipe}>
+            {canEdit ? 'Ver / editar receta' : 'Ver receta'}
+          </Button>
+          {canEdit && (
+            <Button className="flex-1 text-xs" onClick={onEdit}>
+              Editar
+            </Button>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+=== ARCHIVO: src\features\products\components\ProductFormDialog.tsx
+import { useForm } from 'react-hook-form'
+import {
+  Button,
+  Field,
+  FormActions,
+  FormError,
+  FormGrid,
+  Input,
+  Modal,
+  Select,
+  Textarea,
+} from '@/components/ui'
+import { LIMITS, PRODUCT_CATEGORIES, type Product, type ProductInput } from '@/domain'
+import { useCommand } from '@/hooks/useCommand'
+
+interface ProductFormDialogProps {
+  /** Producto a editar; `undefined` para crear uno nuevo. */
+  product?: Product
+  onClose: () => void
+}
+
+export function ProductFormDialog({ product, onClose }: ProductFormDialogProps) {
+  const { run, error, pending } = useCommand()
+  const { register, handleSubmit } = useForm<ProductInput>({
+    defaultValues: {
+      name: product?.name ?? '',
+      price: product?.price ?? '',
+      category: product?.category ?? PRODUCT_CATEGORIES[0],
+      description: product?.description ?? '',
+    },
+  })
+
+  const onSubmit = handleSubmit(async (values) => {
+    if (await run({ type: 'product/save', payload: { ...values, id: product?.id } })) onClose()
+  })
+
+  return (
+    <Modal open title={product ? 'Editar producto' : 'Nuevo producto'} onClose={onClose}>
+      <form onSubmit={onSubmit} className="mt-4">
+        <FormGrid>
+          <Field label="Nombre del producto *">
+            <Input required maxLength={LIMITS.text} {...register('name')} />
+          </Field>
+          <Field label="Precio de venta (S/) *">
+            <Input type="number" required min={0} step={0.01} {...register('price')} />
+          </Field>
+          <Field label="CategorÃ­a *">
+            <Select {...register('category')}>
+              {PRODUCT_CATEGORIES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="DescripciÃ³n" className="sm:col-span-2">
+            <Textarea maxLength={LIMITS.longText} {...register('description')} />
+          </Field>
+        </FormGrid>
+        <FormError message={error} />
+        <FormActions>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={pending}>
+            Guardar
+          </Button>
+        </FormActions>
+      </form>
+    </Modal>
+  )
+}
+
+=== ARCHIVO: src\features\products\components\RecipeFormDialog.tsx
+import { useFieldArray, useForm } from 'react-hook-form'
+import { Button, FormActions, FormError, Input, Modal, Notice, Select } from '@/components/ui'
+import type { Product, RecipeInput } from '@/domain'
+import { useCommand } from '@/hooks/useCommand'
+import { useIsOwner } from '@/stores/auth.store'
+import { useKitchenData } from '@/stores/kitchen.store'
+
+interface RecipeFormDialogProps {
+  product: Product
+  onClose: () => void
+}
+
+type RecipeValues = Pick<RecipeInput, 'recipe'>
+
+export function RecipeFormDialog({ product, onClose }: RecipeFormDialogProps) {
+  const { ingredients } = useKitchenData()
+  const canEdit = useIsOwner()
+  const { run, error, pending } = useCommand()
+  const { register, control, handleSubmit } = useForm<RecipeValues>({
+    defaultValues: { recipe: product.recipe },
+  })
+  const { fields, append, remove } = useFieldArray({ control, name: 'recipe' })
+
+  const onSubmit = handleSubmit(async ({ recipe }) => {
+    if (await run({ type: 'recipe/save', payload: { id: product.id, recipe } })) onClose()
+  })
+
+  return (
+    <Modal open title={`Receta Â· ${product.name}`} onClose={onClose}>
+      <form onSubmit={onSubmit} className="mt-4">
+        <p className="leading-relaxed text-muted">
+          Cantidades para <strong>una unidad de venta</strong> del producto.
+        </p>
+        <fieldset disabled={!canEdit}>
+          {fields.map((field, index) => (
+            <div
+              key={field.id}
+              className="my-2.5 grid grid-cols-[1fr_80px_30px] gap-[9px] sm:grid-cols-[1fr_100px_32px]"
+            >
+              <Select
+                aria-label="Ingrediente"
+                required
+                {...register(`recipe.${index}.ingredientId`)}
+              >
+                <option value="">Seleccionar insumoâ€¦</option>
+                {ingredients.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({i.unit})
+                  </option>
+                ))}
+              </Select>
+              <Input
+                type="number"
+                step={0.000001}
+                min={0.000001}
+                required
+                placeholder="Cantidad"
+                aria-label="Cantidad del ingrediente"
+                {...register(`recipe.${index}.quantity`)}
+              />
+              <Button
+                className="p-1"
+                aria-label="Eliminar ingrediente"
+                onClick={() => remove(index)}
+              >
+                Ã—
+              </Button>
+            </div>
+          ))}
+        </fieldset>
+        {canEdit && (
+          <Button onClick={() => append({ ingredientId: '', quantity: '' })}>
+            ï¼‹ Agregar ingrediente
+          </Button>
+        )}
+        <Notice>
+          Solo se pueden usar insumos registrados. Los cambios se aplicarÃ¡n a nuevos pedidos; los
+          existentes conservan su receta original.
+        </Notice>
+        {canEdit ? (
+          <>
+            <FormError message={error} />
+            <FormActions>
+              <Button onClick={onClose}>Cancelar</Button>
+              <Button type="submit" variant="primary" disabled={pending}>
+                Guardar receta
+              </Button>
+            </FormActions>
+          </>
+        ) : (
+          <Notice>Requiere permisos de dueÃ±o para editar esta receta.</Notice>
+        )}
+      </form>
+    </Modal>
+  )
+}
+
+=== ARCHIVO: src\features\products\constants.ts
+import type { ProductCategory } from '@/domain'
+
+/** PresentaciÃ³n visual de cada categorÃ­a. */
+export const CATEGORY_STYLE: Record<ProductCategory, { emoji: string; background: string }> = {
+  Postres: { emoji: 'ðŸ°', background: 'bg-[#f0e9df]' },
+  Viandas: { emoji: 'ðŸ²', background: 'bg-[#e8eddc]' },
+  Eventos: { emoji: 'ðŸ½ï¸', background: 'bg-[#ece6ed]' },
+  Otros: { emoji: 'ðŸ¥£', background: 'bg-[#f0e9df]' },
+}
+
+=== ARCHIVO: src\features\products\index.ts
+export { ProductsPage } from './ProductsPage'
+
+=== ARCHIVO: src\features\products\ProductsPage.tsx
+import { useDeferredValue, useMemo, useState } from 'react'
+import { PageHeader } from '@/components/layout'
+import { Button, EmptyState, Input, Panel, Select } from '@/components/ui'
+import { PRODUCT_CATEGORIES, type ProductCategory } from '@/domain'
+import { useIsOwner } from '@/stores/auth.store'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { ProductCard } from './components/ProductCard'
+import { ProductFormDialog } from './components/ProductFormDialog'
+import { RecipeFormDialog } from './components/RecipeFormDialog'
+
+type CategoryFilter = 'Todas' | ProductCategory
+
+type DialogState =
+  { kind: 'product'; productId?: string } | { kind: 'recipe'; productId: string } | null
+
+export function ProductsPage() {
+  const { products } = useKitchenData()
+  const isOwner = useIsOwner()
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState<CategoryFilter>('Todas')
+  const [dialog, setDialog] = useState<DialogState>(null)
+  const deferredQuery = useDeferredValue(query)
+
+  const visible = useMemo(() => {
+    const q = deferredQuery.toLocaleLowerCase()
+    return products.filter(
+      (p) =>
+        (category === 'Todas' || p.category === category) && p.name.toLocaleLowerCase().includes(q),
+    )
+  }, [products, category, deferredQuery])
+
+  const dialogProduct = dialog?.productId
+    ? products.find((p) => p.id === dialog.productId)
+    : undefined
+  const close = () => setDialog(null)
+
+  return (
+    <>
+      <PageHeader
+        title="Productos y recetas"
+        subtitle="Agrega tus productos y los ingredientes de cada receta."
+        action={
+          isOwner && (
+            <Button
+              variant="primary"
+              className="text-xs whitespace-nowrap md:text-sm"
+              onClick={() => setDialog({ kind: 'product' })}
+            >
+              ï¼‹ Nuevo producto
+            </Button>
+          )
+        }
+      />
+
+      <div className="mb-[22px] flex flex-wrap items-center gap-3">
+        <Input
+          type="search"
+          className="max-w-[400px] min-w-[180px] flex-1"
+          placeholder="Buscar un productoâ€¦"
+          aria-label="Buscar productos"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <Select
+          className="w-auto"
+          aria-label="CategorÃ­a"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as CategoryFilter)}
+        >
+          {(['Todas', ...PRODUCT_CATEGORIES] as const).map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </Select>
+        <span className="text-[11px] text-muted">{visible.length} productos</span>
+      </div>
+
+      {visible.length ? (
+        <div className="grid grid-cols-1 gap-[19px] sm:grid-cols-2 xl:grid-cols-3">
+          {visible.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              canEdit={isOwner}
+              onOpenRecipe={() => setDialog({ kind: 'recipe', productId: product.id })}
+              onEdit={() => setDialog({ kind: 'product', productId: product.id })}
+            />
+          ))}
+        </div>
+      ) : (
+        <Panel>
+          <EmptyState title="No se encontraron resultados">
+            Prueba con otro nombre o registra un nuevo producto.
+          </EmptyState>
+        </Panel>
+      )}
+
+      {dialog?.kind === 'product' && <ProductFormDialog product={dialogProduct} onClose={close} />}
+      {dialog?.kind === 'recipe' && dialogProduct && (
+        <RecipeFormDialog product={dialogProduct} onClose={close} />
+      )}
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\shopping\components\ShoppingTable.tsx
+import { Badge, EmptyState, Table, Td, Th, Tr } from '@/components/ui'
+import type { ShoppingItem } from '@/domain'
+import { formatMoney, formatQuantity } from '@/lib/format'
+
+export function ShoppingTable({ items }: { items: ShoppingItem[] }) {
+  return (
+    <>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Insumo</Th>
+            <Th>Necesario</Th>
+            <Th>Disponible</Th>
+            <Th>Comprar</Th>
+            <Th>Estimado</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((i) => (
+            <Tr key={i.id}>
+              <Td>
+                <strong>{i.name}</strong>
+              </Td>
+              <Td>
+                {formatQuantity(i.required)} {i.unit}
+              </Td>
+              <Td>
+                {formatQuantity(i.available)} {i.unit}
+              </Td>
+              <Td>
+                <Badge tone={i.buy ? 'warn' : 'neutral'}>
+                  {formatQuantity(i.buy)} {i.unit}
+                </Badge>
+              </Td>
+              <Td>{formatMoney(i.buy * i.cost)}</Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+      {!items.length && (
+        <EmptyState>No hay pedidos pendientes ni confirmados en esta semana.</EmptyState>
+      )}
+    </>
+  )
+}
+
+=== ARCHIVO: src\features\shopping\index.ts
+export { ShoppingPage } from './ShoppingPage'
+
+=== ARCHIVO: src\features\shopping\ShoppingPage.tsx
+import { useMemo } from 'react'
+import { PageHeader, WeekToolbar } from '@/components/layout'
+import { Button, Footnote, Panel, PanelHeader, StatCard, StatGrid } from '@/components/ui'
+import { shoppingList } from '@/domain'
+import { addDays } from '@/lib/dates'
+import { formatMoney } from '@/lib/format'
+import { useKitchenData } from '@/stores/kitchen.store'
+import { useWeekStore } from '@/stores/week.store'
+import { ShoppingTable } from './components/ShoppingTable'
+
+export function ShoppingPage() {
+  const state = useKitchenData()
+  const start = useWeekStore((s) => s.start)
+  const items = useMemo(() => shoppingList(state, start, addDays(start, 6)), [state, start])
+  const budget = items.reduce((sum, i) => sum + i.buy * i.cost, 0)
+
+  return (
+    <>
+      <PageHeader
+        title="Lista de compras"
+        subtitle="Estos son los ingredientes que necesitas para tus pedidos."
+      />
+      <WeekToolbar />
+      <StatGrid>
+        <StatCard
+          label="Insumos por comprar"
+          value={items.filter((i) => i.buy > 0).length}
+          hint="Para los pedidos de esta semana"
+        />
+        <StatCard
+          label="Presupuesto estimado"
+          value={formatMoney(budget)}
+          hint="Total aproximado de la compra"
+        />
+      </StatGrid>
+      <Panel>
+        <PanelHeader title="Lista de compras semanal">
+          <Button onClick={() => window.print()}>Imprimir lista</Button>
+        </PanelHeader>
+        <ShoppingTable items={items} />
+      </Panel>
+      <Footnote>Cuando recibas tu compra, actualiza las cantidades en Insumos.</Footnote>
+    </>
+  )
+}
+
+=== ARCHIVO: src\hooks\useCommand.ts
+import { useCallback, useState } from 'react'
+import type { KitchenCommand } from '@/domain'
+import { errorMessage } from '@/lib/errors'
+import { useKitchenStore } from '@/stores/kitchen.store'
+import { toast } from '@/stores/toast.store'
+
+/**
+ * Ejecuta comandos de dominio desde la UI: expone el error para mostrarlo en
+ * el formulario y avisa al usuario cuando se guarda correctamente.
+ */
+export function useCommand() {
+  const dispatch = useKitchenStore((s) => s.dispatch)
+  const pending = useKitchenStore((s) => s.busy)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = useCallback(
+    async (command: KitchenCommand, successMessage = 'Guardado correctamente') => {
+      setError(null)
+      try {
+        await dispatch(command)
+        toast(successMessage)
+        return true
+      } catch (e) {
+        setError(errorMessage(e))
+        return false
+      }
+    },
+    [dispatch],
+  )
+
+  return { run, error, pending, clearError: () => setError(null) }
+}
+
+=== ARCHIVO: src\hooks\useCurrentNavItem.ts
+import { useLocation } from 'react-router'
+import { NAV_ITEMS } from '@/app/navigation'
+
+export function useCurrentNavItem() {
+  const { pathname } = useLocation()
+  return NAV_ITEMS.find((item) => item.path === pathname) ?? NAV_ITEMS[0]!
+}
+
+=== ARCHIVO: src\lib\cn.ts
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+/** Combina clases condicionales y resuelve conflictos de Tailwind. */
+export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))
+
+=== ARCHIVO: src\lib\dates.ts
+import type { IsoDate } from '@/domain'
+
+export const BUSINESS_TIME_ZONE = 'America/Lima'
+
+/** Fecha de hoy (YYYY-MM-DD) en la zona horaria del negocio. */
+export const todayIso = (): IsoDate =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+
+/** Se usa mediodÃ­a UTC para que ninguna zona horaria cambie el dÃ­a. */
+export const parseIso = (date: IsoDate) => new Date(`${date}T12:00:00Z`)
+export const toIso = (date: Date): IsoDate => date.toISOString().slice(0, 10)
+
+export function addDays(date: IsoDate, days: number): IsoDate {
+  const d = parseIso(date)
+  d.setUTCDate(d.getUTCDate() + days)
+  return toIso(d)
+}
+
+/** Lunes de la semana que contiene `date`. */
+export function startOfWeek(date: IsoDate): IsoDate {
+  const d = parseIso(date)
+  return addDays(date, -((d.getUTCDay() + 6) % 7))
+}
+
+export const weekDays = (start: IsoDate): IsoDate[] =>
+  Array.from({ length: 7 }, (_, n) => addDays(start, n))
+
+=== ARCHIVO: src\lib\errors.ts
+export const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'OcurriÃ³ un error inesperado.'
+
+=== ARCHIVO: src\lib\format.ts
+import type { IsoDate } from '@/domain'
+import { BUSINESS_TIME_ZONE, parseIso } from './dates'
+
+const LOCALE = 'es-PE'
+
+const currency = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'PEN' })
+const quantity = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 3 })
+
+export const formatMoney = (value: number) => currency.format(value)
+export const formatQuantity = (value: number) => quantity.format(value)
+
+export const formatShortDate = (date: IsoDate) =>
+  parseIso(date).toLocaleDateString(LOCALE, { day: '2-digit', month: 'short' })
+
+export const formatWeekday = (date: IsoDate) =>
+  parseIso(date).toLocaleDateString(LOCALE, { weekday: 'long' })
+
+export const formatDateTime = (isoDateTime: string) =>
+  new Date(isoDateTime).toLocaleString(LOCALE, { timeZone: BUSINESS_TIME_ZONE })
+
+=== ARCHIVO: src\services\auth\demo-auth-service.ts
+import { z } from 'zod/mini'
+import { ROLES } from '@/domain'
+import type { AuthService, SessionUser } from './types'
+
+const SESSION_KEY = 'barbarita-demo-session'
+
+const sessionSchema = z.object({ name: z.string(), role: z.enum(ROLES) })
+
+/**
+ * âš ï¸ Solo para demostraciÃ³n: las credenciales viven en el cliente.
+ * Reemplazar por un servicio que autentique contra un backend.
+ */
+const DEMO_USERS = [
+  { username: 'admin', password: 'Barbarita2026!', name: 'AdministraciÃ³n', role: 'owner' },
+  { username: 'empleado', password: 'Pedidos2026!', name: 'Empleado', role: 'employee' },
+] as const
+
+export class DemoAuthService implements AuthService {
+  async login(username: string, password: string): Promise<SessionUser> {
+    const match = DEMO_USERS.find((u) => u.username === username && u.password === password)
+    if (!match) throw new Error('Usuario o contraseÃ±a incorrectos.')
+    const user: SessionUser = { name: match.name, role: match.role }
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user))
+    return user
+  }
+
+  async logout(): Promise<void> {
+    sessionStorage.removeItem(SESSION_KEY)
+  }
+
+  restore(): SessionUser | null {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY)
+      if (!raw) return null
+      const result = sessionSchema.safeParse(JSON.parse(raw))
+      if (result.success) return result.data
+      sessionStorage.removeItem(SESSION_KEY)
+    } catch {
+      // SesiÃ³n corrupta o almacenamiento bloqueado: se trata como sin sesiÃ³n.
+    }
+    return null
+  }
+}
+
+=== ARCHIVO: src\services\auth\index.ts
+import { DemoAuthService } from './demo-auth-service'
+
+export type { AuthService, SessionUser } from './types'
+
+export const authService = new DemoAuthService()
+
+=== ARCHIVO: src\services\auth\types.ts
+import type { Role } from '@/domain'
+
+export interface SessionUser {
+  name: string
+  role: Role
+}
+
+export interface AuthService {
+  login(username: string, password: string): Promise<SessionUser>
+  logout(): Promise<void>
+  /** SesiÃ³n guardada, si existe y es vÃ¡lida. */
+  restore(): SessionUser | null
+}
+
+=== ARCHIVO: src\services\storage\index.ts
+import { LocalStorageKitchenRepository } from './local-storage-repository'
+
+export type { KitchenRepository, KitchenSnapshot } from './kitchen-repository'
+
+/** ImplementaciÃ³n activa. Cambiar aquÃ­ para usar otra fuente de datos. */
+export const kitchenRepository = new LocalStorageKitchenRepository()
+
+=== ARCHIVO: src\services\storage\kitchen-repository.ts
+import type { KitchenState } from '@/domain'
+
+export interface KitchenSnapshot {
+  data: KitchenState
+  /** Se incrementa en cada escritura; sirve para detectar cambios concurrentes. */
+  revision: number
+}
+
+/**
+ * Contrato de persistencia. Hoy se implementa con localStorage; para pasar a
+ * un backend basta con crear otra implementaciÃ³n (p. ej. `ApiKitchenRepository`).
+ */
+export interface KitchenRepository {
+  read(): Promise<KitchenSnapshot>
+  write(snapshot: KitchenSnapshot): Promise<void>
+}
+
+=== ARCHIVO: src\services\storage\local-storage-repository.ts
+import { createInitialState } from '@/domain'
+import type { KitchenRepository, KitchenSnapshot } from './kitchen-repository'
+import { parseSnapshot } from './snapshot-schema'
+
+/** Misma clave que la versiÃ³n vanilla, para conservar los datos existentes. */
+const STORAGE_KEY = 'barbarita-html-v1'
+
+export class LocalStorageKitchenRepository implements KitchenRepository {
+  constructor(private readonly key = STORAGE_KEY) {}
+
+  async read(): Promise<KitchenSnapshot> {
+    const raw = localStorage.getItem(this.key)
+    if (!raw) return { data: createInitialState(), revision: 0 }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      throw new Error('Los datos guardados no son vÃ¡lidos. No se han sobrescrito.')
+    }
+    return parseSnapshot(parsed)
+  }
+
+  async write(snapshot: KitchenSnapshot): Promise<void> {
+    localStorage.setItem(this.key, JSON.stringify(snapshot))
+  }
+}
+
+=== ARCHIVO: src\services\storage\snapshot-schema.ts
+import { z } from 'zod/mini'
+import type { KitchenSnapshot } from './kitchen-repository'
+
+const records = z.array(z.record(z.string(), z.unknown()))
+
+export const snapshotSchema = z.object({
+  data: z.object({
+    products: records,
+    ingredients: records,
+    orders: records,
+    movements: records,
+  }),
+  revision: z.int().check(z.nonnegative()),
+})
+
+export function parseSnapshot(value: unknown): KitchenSnapshot {
+  const result = snapshotSchema.safeParse(value)
+  if (!result.success) throw new Error('Los datos guardados no son vÃ¡lidos. No se han sobrescrito.')
+  return result.data as unknown as KitchenSnapshot
+}
+
+=== ARCHIVO: src\stores\auth.store.ts
+import { create } from 'zustand'
+import { authService, type SessionUser } from '@/services/auth'
+
+interface AuthState {
+  user: SessionUser | null
+  login: (username: string, password: string) => Promise<void>
+  logout: () => Promise<void>
+}
+
+export const useAuthStore = create<AuthState>()((set) => ({
+  user: authService.restore(),
+  login: async (username, password) => {
+    const user = await authService.login(username, password)
+    set({ user })
+  },
+  logout: async () => {
+    await authService.logout()
+    set({ user: null })
+  },
+}))
+
+export const useCurrentUser = () => useAuthStore((s) => s.user)
+export const useIsOwner = () => useAuthStore((s) => s.user?.role === 'owner')
+
+=== ARCHIVO: src\stores\kitchen.store.ts
+import { create } from 'zustand'
+import { applyCommand, createInitialState, type KitchenCommand, type KitchenState } from '@/domain'
+import { errorMessage } from '@/lib/errors'
+import { kitchenRepository } from '@/services/storage'
+import { useAuthStore } from './auth.store'
+
+type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+interface KitchenStore {
+  status: LoadStatus
+  loadError: string | null
+  data: KitchenState
+  revision: number
+  busy: boolean
+  load: () => Promise<void>
+  /** Ejecuta un comando de dominio y lo persiste. Lanza un error si falla. */
+  dispatch: (command: KitchenCommand) => Promise<void>
+}
+
+export const useKitchenStore = create<KitchenStore>()((set, get) => ({
+  status: 'idle',
+  loadError: null,
+  data: createInitialState(),
+  revision: 0,
+  busy: false,
+
+  load: async () => {
+    if (get().status === 'loading') return
+    set({ status: 'loading', loadError: null })
+    try {
+      const { data, revision } = await kitchenRepository.read()
+      set({ data, revision, status: 'ready' })
+    } catch (error) {
+      set({ status: 'error', loadError: errorMessage(error) })
+    }
+  },
+
+  dispatch: async (command) => {
+    const user = useAuthStore.getState().user
+    if (!user) throw new Error('Inicia sesiÃ³n.')
+    if (get().busy) throw new Error('Espera a que termine la operaciÃ³n anterior.')
+
+    set({ busy: true })
+    try {
+      // Control de concurrencia optimista: si otra pestaÃ±a guardÃ³ antes, no se sobrescribe.
+      const saved = await kitchenRepository.read()
+      if (saved.revision !== get().revision) {
+        set({ data: saved.data, revision: saved.revision })
+        throw new Error('Los datos cambiaron en otra pestaÃ±a. Revisa y vuelve a guardar.')
+      }
+      const next = {
+        data: applyCommand(saved.data, command, user.role),
+        revision: saved.revision + 1,
+      }
+      await kitchenRepository.write(next)
+      set(next)
+    } finally {
+      set({ busy: false })
+    }
+  },
+}))
+
+export const useKitchenData = () => useKitchenStore((s) => s.data)
+
+// Al cerrar sesiÃ³n se descarta el estado en memoria; se vuelve a leer en el prÃ³ximo ingreso.
+useAuthStore.subscribe((auth, prev) => {
+  if (prev.user && !auth.user)
+    useKitchenStore.setState({ status: 'idle', data: createInitialState(), revision: 0 })
+})
+
+=== ARCHIVO: src\stores\toast.store.ts
+import { create } from 'zustand'
+
+interface ToastState {
+  message: string | null
+  /** Cambia en cada aviso para reiniciar el temporizador aunque el texto se repita. */
+  key: number
+  show: (message: string) => void
+  dismiss: () => void
+}
+
+export const useToastStore = create<ToastState>()((set) => ({
+  message: null,
+  key: 0,
+  show: (message) => set((s) => ({ message, key: s.key + 1 })),
+  dismiss: () => set({ message: null }),
+}))
+
+/** Atajo para usar fuera de componentes. */
+export const toast = (message: string) => useToastStore.getState().show(message)
+
+=== ARCHIVO: src\stores\week.store.ts
+import { create } from 'zustand'
+import type { IsoDate } from '@/domain'
+import { addDays, startOfWeek, todayIso } from '@/lib/dates'
+
+/** Semana seleccionada; compartida entre Calendario y Lista de compras. */
+interface WeekState {
+  start: IsoDate
+  shift: (weeks: number) => void
+}
+
+export const useWeekStore = create<WeekState>()((set) => ({
+  start: startOfWeek(todayIso()),
+  shift: (weeks) => set((s) => ({ start: addDays(s.start, weeks * 7) })),
+}))
+
+=== ARCHIVO: src\styles\index.css
+@import 'tailwindcss';
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/manrope';
+
+/* Tokens de diseÃ±o: usar estas utilidades (bg-brand, text-ink, border-lineâ€¦) en vez de colores sueltos. */
+@theme {
+  --font-sans: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Manrope Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+
+  --color-ink: #253e36;
+  --color-muted: #7b827c;
+  --color-subtle: #858d7c;
+  --color-canvas: #f6f7f2;
+  --color-line: #e6e9e2;
+  --color-line-soft: #eff1eb;
+  --color-field: #dce2d7;
+
+  --color-brand: #244b3e;
+  --color-brand-ink: #234d3b;
+  --color-brand-soft: #eaf0e7;
+  --color-gold: #e8cfa1;
+  --color-accent: #eebd77;
+  --color-link: #5c7554;
+
+  --color-sage-50: #f4f5e9;
+  --color-sage-100: #edf2e6;
+  --color-sage-200: #dce7d7;
+
+  --color-warn: #a77c31;
+  --color-warn-soft: #fff0d8;
+  --color-danger: #a84135;
+  --color-error: #b34436;
+}
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-sm text-ink antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display font-bold;
+  }
+  h1 {
+    @apply text-[25px] tracking-[-1px] md:text-[30px];
+  }
+  h2 {
+    @apply text-lg;
+  }
+  h3 {
+    @apply text-base;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline-offset: 4px;
+  }
+  dialog::backdrop {
+    background: #102c246b;
+    backdrop-filter: blur(3px);
+  }
+}
+
+=== ARCHIVO: src\main.tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { App } from '@/app/App'
+import '@/styles/index.css'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+=== ARCHIVO: legacy\app.js
+let state,revision=0,user,hosted=false,page='Resumen',query='',category='Todas',orderFilter='Todos',busy=false;
+const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const iso=d=>d.toISOString().slice(0,10);let week=new Date(today()+'T12:00:00Z');week.setUTCDate(week.getUTCDate()-((week.getUTCDay()+6)%7));
+const $=s=>document.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=x=>new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN'}).format(x),qty=x=>Number(x).toLocaleString('es-PE',{maximumFractionDigits:3}),date=x=>new Date(x+'T12:00:00Z').toLocaleDateString('es-PE',{day:'2-digit',month:'short'}),owner=()=>user?.role==='owner';
+const icons={Resumen:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',Pedidos:'<path d="M7 4H5v17h14V4h-2M9 3h6v4H9zM8 12h8M8 16h5"/>',Productos:'<path d="M4 8l8-5 8 5v11l-8 3-8-3zM4 8l8 4 8-4M12 12v10"/>',Insumos:'<path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6"/>',Calendario:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 11h18M7 15h2M14 15h2"/>',Compras:'<path d="M2 3h3l3 13h11l3-9H6M10 21h.01M18 21h.01"/>'};
+const icon=n=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[n]||icons.Productos}</svg>`;
+const art=`<svg class="hero-art" viewBox="0 0 220 140" fill="none" aria-hidden="true"><ellipse cx="112" cy="127" rx="86" ry="9" fill="#d9e2ce"/><path d="M65 75h105l-13 43H80z" fill="#54745a"/><path d="M56 74h123" stroke="#315840" stroke-width="7" stroke-linecap="round"/><path d="M94 71c-21-14-43-16-43-35 27-3 36 17 43 35M113 71c-9-37 5-47 12-57 11 25 6 38-12 57M132 70c4-28 26-37 46-32-8 24-30 26-46 32" fill="#8ca06d"/><path d="M103 74c-20-17-4-40 10-36 19 6 17 21 7 36" fill="#cf9867"/><circle cx="148" cy="67" r="15" fill="#dfb46c"/><path d="M37 104h28M46 94v20M190 79v16M182 87h16" stroke="#acb78b" stroke-width="2"/></svg>`;
+function toast(t){$('#toast').textContent=t;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',4000)}
+const STORAGE_KEY='barbarita-html-v1',SESSION_KEY='barbarita-demo-session';
+function readData(){const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return {data:initial(),revision:0};const saved=JSON.parse(raw);if(!saved.data||!Array.isArray(saved.data.products)||!Array.isArray(saved.data.ingredients)||!Array.isArray(saved.data.orders)||!Array.isArray(saved.data.movements)||!Number.isInteger(saved.revision))throw Error('Los datos guardados no son vÃ¡lidos. No se han sobrescrito.');return saved}
+async function load(){try{const session=sessionStorage.getItem(SESSION_KEY);if(!session){login();return}const candidate=JSON.parse(session);if(!['owner','employee'].includes(candidate.role)||typeof candidate.name!=='string'){sessionStorage.removeItem(SESSION_KEY);login();return}user=candidate;const saved=readData();state=saved.data;revision=saved.revision;render()}catch(e){$('#app').innerHTML=`<div class="loading"><h2>No se pudieron leer los datos locales</h2><p>${esc(e.message)}</p><p>Habilita el almacenamiento del navegador. Conserva una copia de tus datos antes de borrar el almacenamiento.</p><button data-action="reload">Reintentar</button></div>`}}
+async function save(action,payload){if(busy)return;busy=true;try{if(!user)throw Error('Inicia sesiÃ³n.');const saved=readData();if(saved.revision!==revision){state=saved.data;revision=saved.revision;throw Error('Los datos cambiaron en otra pestaÃ±a. Revisa y vuelve a guardar.')}const next=mutate(state,action,payload,user.role);const serialized=JSON.stringify({data:next,revision:revision+1});localStorage.setItem(STORAGE_KEY,serialized);state=next;revision++;$('#modal').close();render();toast('Guardado correctamente');return true}catch(e){const el=$('#form-error');if(el)el.textContent=e.message;else toast(e.message)}finally{busy=false}}
+function login(){ $('#app').innerHTML=`<div class="login"><section class="login-art"><div class="eyebrow" style="color:#c8d5b8">SABORES DE BARBARITA Â· SURQUILLO</div><h1>Tu cocina,<br>mejor organizada.</h1><p>Cada pedido en su lugar.<br>Cada ingrediente, justo a tiempo.</p>${art}</section><section class="login-form"><form id="login-form"><div class="brand"><span class="brand-mark">â™§</span><div><small>SABORES DE</small><strong>Barbarita</strong></div></div><h2>Bienvenido a tu cocina</h2><p class="muted">Ingresa para organizar tu dÃ­a.</p>${hosted?'<a class="primary" style="display:block;padding:14px;border-radius:8px;text-align:center" href="/signin-with-chatgpt?return_to=%2Fapp.html" target="_top">Continuar con ChatGPT</a>':'<label>Usuario<input name="username" required autocomplete="username" autofocus></label><label>ContraseÃ±a<input name="password" type="password" required autocomplete="current-password"></label><button class="primary">Iniciar sesiÃ³n â†’</button>'}<div class="error" id="login-error" role="alert"></div></form></section></div>`}
+function render(){const names=Object.keys(icons);$('#app').innerHTML=`<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">â™§</span><div><small>SABORES DE</small><strong>Barbarita</strong></div></div><div class="nav-label">Mi negocio</div><nav class="nav" aria-label="Principal">${names.map(n=>`<button data-page="${n}" class="${page===n?'active':''}">${icon(n)}${n==='Productos'?'Productos y recetas':n==='Compras'?'Lista de compras':n}</button>`).join('')}</nav><div class="side-bottom"><span>Surquillo, Lima Â· PerÃº</span></div></aside><div class="workspace"><header class="topbar"><span class="muted">Mi cocina <span style="padding:0 12px;color:#bcc3b7">/</span> <strong style="color:#52614b">${page}</strong></span><div class="user"><span class="avatar">${esc(user.name.slice(0,1).toUpperCase())}</span><span>${esc(user.name)}<small>${owner()?'DueÃ±o Â· Acceso completo':'Empleado Â· GestiÃ³n de pedidos'}</small></span></div><button class="link-button" data-action="logout">Salir</button></header><main id="main">${content()}</main></div></div>`}
+function head(title,sub,action,label){return `<div class="page-head"><div><div class="eyebrow" style="margin-bottom:10px">MI COCINA / ${esc(page)}</div><h1>${title}</h1><p class="muted" style="margin-bottom:0">${sub}</p></div>${action?`<button class="primary" data-action="${action}">ï¼‹ ${label}</button>`:''}</div>`}
+function total(o){return o.items.reduce((s,l)=>s+l.price*l.quantity,0)}
+function ordersTable(list,short=false){return list.length?`<div class="table-wrap"><table><thead><tr><th>Pedido / cliente</th><th>Entrega</th><th>Importe</th><th>Estado</th>${short?'':'<th>Acciones</th>'}</tr></thead><tbody>${list.map(o=>`<tr><td><strong>#${String(o.number).padStart(3,'0')} Â· ${esc(o.customer)}</strong><div class="muted tiny">${esc(o.items.map(l=>l.quantity+' Ã— '+l.name).join(', '))}</div></td><td>${date(o.date)}</td><td>${money(total(o))}</td><td><span class="badge ${o.status}">${o.status}</span></td>${short?'':`<td><button class="link-button" data-action="order-detail" data-id="${o.id}">Ver detalle</button></td>`}</tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>Todo listo para tu primer pedido</strong>Registra productos y sus recetas para empezar.</div>'}
+function content(){if(page==='Resumen'){const pending=state.orders.filter(o=>['Pendiente','Confirmado'].includes(o.status)),low=state.ingredients.filter(i=>i.stock-(reserved(state)[i.id]||0)<=i.minimum);return head('Resumen del negocio','Revisa tus pedidos y lo que falta comprar.','order','Nuevo pedido')+`<div class="stats">${[['Pedidos pendientes',pending.length,'Por preparar y entregar','Pedidos'],['Entregas de hoy',pending.filter(o=>o.date===today()).length,'Agenda del dÃ­a','Calendario'],['Stock por revisar',low.length,'Insumos en el mÃ­nimo o menos','Insumos'],['Total de pedidos activos',money(pending.reduce((s,o)=>s+total(o),0)),'Pedidos pendientes y confirmados','Compras']].map(([t,n,s,i])=>`<div class="stat"><div class="stat-top">${t}<span class="stat-icon">${icon(i)}</span></div><strong>${n}</strong><small>${s}</small></div>`).join('')}</div><div class="columns"><section class="panel"><div class="panel-head"><h2>PrÃ³ximos pedidos</h2><button class="link-button" data-page="Pedidos">Ver todos â†’</button></div>${ordersTable([...pending].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5),true)}</section><section class="panel"><div class="panel-head"><h2>Insumos por reponer</h2><span class="badge warn">${low.length} avisos</span></div>${low.length?low.slice(0,5).map(i=>`<div class="row"><div><strong><span class="dot"></span>${esc(i.name)}</strong><small>MÃ­nimo: ${qty(i.minimum)} ${i.unit}</small></div><span>${qty(i.stock-(reserved(state)[i.id]||0))} ${i.unit}</span></div>`).join(''):'<div class="empty"><strong>Sin alertas de stock</strong>Tu inventario se mostrarÃ¡ aquÃ­.</div>'}<button class="link-button" data-page="Insumos" style="margin-top:20px">Revisar inventario â†’</button></section></div>${owner()&&!state.products.length&&!state.ingredients.length?'<div class="notice">Para comenzar, <button class="link-button" data-page="Insumos">registra tus insumos</button> y luego agrega tus productos.</div>':''}`}
+ if(page==='Productos'){const list=state.products.filter(p=>(category==='Todas'||p.category===category)&&p.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));return head('Productos y recetas','Agrega tus productos y los ingredientes de cada receta.',owner()?'product':null,'Nuevo producto')+`<div class="toolbar"><input class="search" id="search" placeholder="Buscar un productoâ€¦" aria-label="Buscar productos" value="${esc(query)}"><select id="category" aria-label="CategorÃ­a">${['Todas','Viandas','Postres','Eventos','Otros'].map(c=>`<option ${c===category?'selected':''}>${c}</option>`).join('')}</select><span class="muted tiny">${list.length} productos</span></div><div class="grid">${list.map(p=>`<article class="product"><div class="product-art ${p.category}"><span class="badge">${esc(p.category)}</span><span aria-hidden="true">${p.category==='Postres'?'ðŸ°':p.category==='Viandas'?'ðŸ²':p.category==='Eventos'?'ðŸ½ï¸':'ðŸ¥£'}</span></div><div class="product-body"><h3>${esc(p.name)}</h3><p class="muted">${esc(p.description||'Preparado con el sabor de casa.')}</p><div class="product-bottom"><span class="price">${money(p.price)}</span><span class="badge ${p.recipe.length?'':'warn'}">${p.recipe.length?p.recipe.length+' ingredientes':'Sin receta'}</span></div><div class="product-actions"><button data-action="recipe" data-id="${p.id}">${owner()?'Ver / editar receta':'Ver receta'}</button>${owner()?`<button data-action="product" data-id="${p.id}">Editar</button>`:''}</div></div></article>`).join('')}</div>${list.length?'':'<div class="panel empty"><strong>No se encontraron resultados</strong>Prueba con otro nombre o registra un nuevo producto.</div>'}`}
+ if(page==='Insumos'){const r=reserved(state);return head('Insumos','Revisa tus ingredientes y registra las compras.',owner()?'ingredient':null,'Nuevo insumo')+`<section class="panel"><div class="table-wrap"><table><thead><tr><th>Insumo</th><th>En almacÃ©n</th><th>Reservado</th><th>Disponible</th><th>MÃ­nimo</th><th>Precio por unidad</th><th></th></tr></thead><tbody>${state.ingredients.map(i=>`<tr><td><strong>${esc(i.name)}</strong></td><td>${qty(i.stock)} ${i.unit}</td><td>${qty(r[i.id]||0)}</td><td><span class="badge ${i.stock-(r[i.id]||0)<=i.minimum?'warn':''}">${qty(i.stock-(r[i.id]||0))} ${i.unit}</span></td><td>${qty(i.minimum)}</td><td>${money(i.cost)}</td><td>${owner()?`<button class="link-button" data-action="stock" data-id="${i.id}">Actualizar cantidad</button>`:''}</td></tr>`).join('')}</tbody></table></div>${state.ingredients.length?'':'<div class="empty">AÃºn no hay insumos. Registra el primero para crear recetas.</div>'}</section><section class="panel"><h2>Ãšltimos movimientos</h2>${state.movements.slice(-15).reverse().map(m=>`<div class="row"><div><strong>${esc(m.ingredient)}</strong><small>${esc(m.note)} Â· ${new Date(m.date).toLocaleString('es-PE',{timeZone:'America/Lima'})}</small></div><span>${m.quantity>0?'+':''}${qty(m.quantity)} ${m.unit}</span></div>`).join('')||'<div class="empty">Los ingresos y consumos aparecerÃ¡n aquÃ­.</div>'}</section>`}
+ if(page==='Pedidos')return head('Pedidos','Registra y revisa los pedidos de tus clientes.','order','Nuevo pedido')+`<div class="toolbar">${['Todos','Pendiente','Confirmado','Entregado','Cancelado'].map(s=>`<button class="${orderFilter===s?'secondary':''}" data-filter="${s}">${s}</button>`).join('')}</div><section class="panel">${ordersTable([...state.orders].filter(o=>orderFilter==='Todos'||o.status===orderFilter).reverse())}</section><p class="footnote">Al confirmar un pedido se apartan sus ingredientes. Al entregarlo se descuentan del almacÃ©n.</p>`;
+ if(page==='Calendario'){const days=Array.from({length:7},(_,n)=>{const d=new Date(week);d.setUTCDate(d.getUTCDate()+n);return iso(d)});return head('Calendario de entregas','Revisa los pedidos de cada dÃ­a.')+weekToolbar()+`<div class="table-wrap"><div class="calendar">${days.map(d=>`<div class="day"><div class="day-title">${new Date(d+'T12:00Z').toLocaleDateString('es-PE',{weekday:'long'})}<strong>${d.slice(-2)}</strong></div>${state.orders.filter(o=>o.date===d&&o.status!=='Cancelado').map(o=>`<button class="event" style="width:100%;text-align:left" data-action="order-detail" data-id="${o.id}"><strong>${esc(o.customer)}</strong>#${o.number} Â· ${o.items.reduce((s,l)=>s+l.quantity,0)} productos<br>${o.status}</button>`).join('')||'<span class="muted tiny">Sin entregas</span>'}</div>`).join('')}</div></div>`}
+ if(page==='Compras'){const end=new Date(week);end.setUTCDate(end.getUTCDate()+6);const list=shopping(state,iso(week),iso(end));return head('Lista de compras','Estos son los ingredientes que necesitas para tus pedidos.')+weekToolbar()+`<div class="stats"><div class="stat"><div class="stat-top">Insumos por comprar</div><strong>${list.filter(i=>i.buy>0).length}</strong><small>Para los pedidos de esta semana</small></div><div class="stat"><div class="stat-top">Presupuesto estimado</div><strong>${money(list.reduce((s,i)=>s+i.buy*i.cost,0))}</strong><small>Total aproximado de la compra</small></div></div><section class="panel"><div class="panel-head"><h2>Lista de compras semanal</h2><button data-action="print">Imprimir lista</button></div><div class="table-wrap"><table><thead><tr><th>Insumo</th><th>Necesario</th><th>Disponible</th><th>Comprar</th><th>Estimado</th></tr></thead><tbody>${list.map(i=>`<tr><td><strong>${esc(i.name)}</strong></td><td>${qty(i.required)} ${i.unit}</td><td>${qty(i.available)} ${i.unit}</td><td><span class="badge ${i.buy?'warn':''}">${qty(i.buy)} ${i.unit}</span></td><td>${money(i.buy*i.cost)}</td></tr>`).join('')}</tbody></table></div>${list.length?'':'<div class="empty">No hay pedidos pendientes ni confirmados en esta semana.</div>'}</section><p class="footnote">Cuando recibas tu compra, actualiza las cantidades en Insumos.</p>`}}
+function weekToolbar(){const end=new Date(week);end.setUTCDate(end.getUTCDate()+6);return `<div class="toolbar"><button data-week="-7" aria-label="Semana anterior">â†</button><strong>${date(iso(week))} â€“ ${date(iso(end))}, ${week.getUTCFullYear()}</strong><button data-week="7" aria-label="Semana siguiente">â†’</button></div>`}
+function modal(title,html){$('#modal-content').innerHTML=`<div class="modal-title"><h2>${title}</h2><button data-action="close" aria-label="Cerrar">Ã—</button></div>${html}`;$('#modal').showModal()}
+const actions=label=>`<div class="error" id="form-error" role="alert"></div><div class="form-actions"><button type="button" data-action="close">Cancelar</button><button class="primary">${label||'Guardar'}</button></div>`;
+const field=(label,name,value='',type='text',extra='')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" required ${extra}></label>`;
+function openForm(action,id){
+ if(action==='product'){const p=state.products.find(p=>p.id===id)||{};modal(p.id?'Editar producto':'Nuevo producto',`<form data-form="product" data-id="${p.id||''}"><div class="form-grid">${field('Nombre del producto *','name',p.name||'','text','maxlength="150"')}${field('Precio de venta (S/) *','price',p.price??'','number','min="0" step="0.01"')}<label>CategorÃ­a *<select name="category">${['Viandas','Postres','Eventos','Otros'].map(c=>`<option ${p.category===c?'selected':''}>${c}</option>`).join('')}</select></label><label class="full">DescripciÃ³n<textarea name="description" maxlength="500">${esc(p.description||'')}</textarea></label></div>${actions()}</form>`)}
+ if(action==='ingredient')modal('Nuevo insumo',`<form data-form="ingredient"><div class="form-grid">${field('Nombre *','name')}<label>Unidad base *<select name="unit"><option>kg</option><option>L</option><option>unidad</option></select></label>${field('Cantidad inicial *','stock',0,'number','min="0" step="0.001"')}${field('Cantidad mÃ­nima *','minimum',0,'number','min="0" step="0.001"')}${field('Costo por unidad (S/) *','cost',0,'number','min="0" step="0.01"')}</div><p class="notice">Usa la misma unidad al definir recetas. Ejemplo: 500 g = 0.5 kg.</p>${actions()}</form>`);
+ if(action==='stock'){const i=state.ingredients.find(i=>i.id===id);modal('Movimiento Â· '+esc(i.name),`<form data-form="stock" data-id="${id}"><div class="form-grid"><label>Movimiento<select name="kind"><option value="entrada">Entrada / compra</option><option value="salida">Salida / merma</option></select></label>${field('Cantidad en '+i.unit,'quantity','','number','min="0.001" step="0.001"')}<label class="full">Motivo *<input name="note" required maxlength="150" placeholder="Compra semanal, mermaâ€¦"></label></div>${actions()}</form>`)}
+ if(action==='recipe'){const p=state.products.find(p=>p.id===id);modal('Receta Â· '+esc(p.name),`<form data-form="recipe" data-id="${id}"><p class="muted">Cantidades para <strong>una unidad de venta</strong> del producto.</p><div id="lines">${p.recipe.map(r=>recipeLine(r)).join('')}</div>${owner()?'<button type="button" data-action="add-recipe">ï¼‹ Agregar ingrediente</button>':''}<p class="notice">Solo se pueden usar insumos registrados. Los cambios se aplicarÃ¡n a nuevos pedidos; los existentes conservan su receta original.</p>${owner()?actions('Guardar receta'):'<p class="notice">Requiere permisos de dueÃ±o para editar esta receta.</p>'}</form>`);if(!owner())$('#lines').querySelectorAll('input,select,button').forEach(x=>x.disabled=true)}
+ if(action==='order'){if(!state.products.some(p=>p.recipe.length)){toast('Primero registra un producto y define su receta.');return}modal('Nuevo pedido',`<form data-form="order"><div class="form-grid">${field('Nombre del cliente *','customer')}${field('Fecha de entrega *','date',today(),'date')}<label>Canal<select name="channel"><option>WhatsApp</option><option>Instagram</option><option>Directo</option></select></label></div><h3 style="margin-top:22px">Productos</h3><div id="lines">${orderLine()}</div><button type="button" data-action="add-order">ï¼‹ Agregar producto</button><label style="display:block;margin-top:20px">Notas<textarea name="notes" maxlength="500"></textarea></label><p class="notice">El pedido se registra como pendiente. Al confirmarlo se validan y reservan los insumos disponibles.</p>${actions('Registrar pedido')}</form>`)}
+ if(action==='order-detail'){const o=state.orders.find(o=>o.id===id);modal('Pedido #'+String(o.number).padStart(3,'0'),`<h3>${esc(o.customer)}</h3><p class="muted">${date(o.date)} Â· ${esc(o.channel)} Â· <span class="badge ${o.status}">${o.status}</span></p>${o.items.map(l=>`<div class="row"><span>${l.quantity} Ã— ${esc(l.name)}</span><strong>${money(l.price*l.quantity)}</strong></div>`).join('')}<div class="row"><strong>Total</strong><strong>${money(total(o))}</strong></div>${o.notes?`<p class="notice">${esc(o.notes)}</p>`:''}<div id="form-error" class="error" role="alert"></div><div class="form-actions">${['Pendiente','Confirmado'].includes(o.status)?`<button class="danger" data-status="Cancelado" data-id="${id}">Cancelar pedido</button><button class="primary" data-status="${o.status==='Pendiente'?'Confirmado':'Entregado'}" data-id="${id}">${o.status==='Pendiente'?'Confirmar y reservar':'Marcar entregado'}</button>`:'<button data-action="close">Cerrar</button>'}</div>`)}
+}
+function recipeLine(r={}){return `<div class="line-item"><select aria-label="Ingrediente" class="ingredient-select" required><option value="">Seleccionar insumoâ€¦</option>${state.ingredients.map(i=>`<option value="${i.id}" ${r.ingredientId===i.id?'selected':''}>${esc(i.name)} (${i.unit})</option>`).join('')}</select><input class="quantity" type="number" step="0.000001" min="0.000001" required aria-label="Cantidad del ingrediente" value="${r.quantity||''}" placeholder="Cantidad"><button type="button" data-action="remove-line" aria-label="Eliminar ingrediente">Ã—</button></div>`}
+function orderLine(){return `<div class="line-item"><select class="product-select" aria-label="Producto" required>${state.products.filter(p=>p.recipe.length).map(p=>`<option value="${p.id}">${esc(p.name)} Â· ${money(p.price)}</option>`).join('')}</select><input class="quantity" type="number" min="1" step="1" value="1" required aria-label="Cantidad de productos"><button type="button" data-action="remove-line" aria-label="Quitar producto">Ã—</button></div>`}
+document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.page){page=b.dataset.page;query='';render()}if(b.dataset.filter){orderFilter=b.dataset.filter;render()}if(b.dataset.week){week.setUTCDate(week.getUTCDate()+Number(b.dataset.week));render()}if(b.dataset.status){if(b.dataset.status==='Cancelado'&&!confirm('Â¿Cancelar este pedido y liberar sus reservas?'))return;await save('status',{id:b.dataset.id,status:b.dataset.status})}const a=b.dataset.action;if(!a)return;if(a==='close')$('#modal').close();else if(a==='reload')load();else if(a==='logout'){sessionStorage.removeItem(SESSION_KEY);user=null;state=null;load()}else if(a==='add-recipe')$('#lines').insertAdjacentHTML('beforeend',recipeLine());else if(a==='add-order')$('#lines').insertAdjacentHTML('beforeend',orderLine());else if(a==='remove-line')b.closest('.line-item').remove();else if(a==='demo')await save('demo',{});else if(a==='print'){window.print()}else openForm(a,b.dataset.id)});
+document.addEventListener('input',e=>{if(e.target.id==='search'){const pos=e.target.selectionStart;query=e.target.value;$('#main').innerHTML=content();$('#search').focus();$('#search').setSelectionRange(pos,pos)}});
+document.addEventListener('change',e=>{if(e.target.id==='category'){category=e.target.value;render()}});
+document.addEventListener('submit',async e=>{e.preventDefault();const f=e.target;if(f.id==='login-form'){try{const p=Object.fromEntries(new FormData(f));const users=[{username:'admin',password:'Barbarita2026!',name:'AdministraciÃ³n',role:'owner'},{username:'empleado',password:'Pedidos2026!',name:'Empleado',role:'employee'}];const u=users.find(u=>u.username===p.username&&u.password===p.password);if(!u)throw Error('Usuario o contraseÃ±a incorrectos.');sessionStorage.setItem(SESSION_KEY,JSON.stringify({name:u.name,role:u.role}));load()}catch(e){$('#login-error').textContent=e.message}return}if(!f.dataset.form)return;const p=Object.fromEntries(new FormData(f));if(f.dataset.id)p.id=f.dataset.id;if(f.dataset.form==='recipe')p.recipe=[...f.querySelectorAll('.line-item')].map(l=>({ingredientId:l.querySelector('select').value,quantity:l.querySelector('input').value}));if(f.dataset.form==='order')p.items=[...f.querySelectorAll('.line-item')].map(l=>({productId:l.querySelector('select').value,quantity:l.querySelector('input').value}));await save(f.dataset.form,p)});
+load();
+
+=== ARCHIVO: legacy\index.html
+<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#1c4037"><title>Sabores de Barbarita Â· Mi cocina</title><link rel="stylesheet" href="style.css"></head><body><div id="app"><div class="loading">Preparando tu cocinaâ€¦</div></div><div id="toast" role="status" aria-live="polite"></div><dialog id="modal"><div id="modal-content"></div></dialog><script src="model.js"></script><script src="app.js"></script></body></html>
+
+=== ARCHIVO: legacy\model.js
+const round=n=>Math.round(n*1000000)/1000000;
+const fail=m=>{throw new Error(m)};
+const text=(x,label)=>{if(typeof x!=='string'||!x.trim()||x.length>150)fail(label+' es obligatorio (mÃ¡ximo 150 caracteres).');return x.trim()};
+const num=(x,label,min=0)=>{if(x===''||x===null||!Number.isFinite(Number(x))||Number(x)<min||Number(x)>1e9)fail(label+' no es vÃ¡lido.');return Number(x)};
+const id=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),x=>x.toString(16).padStart(2,'0')).join('');
+function initial(){return {products:[],ingredients:[],orders:[],movements:[]}}
+function needs(order){const result={};for(const line of order.items)for(const r of line.recipe)result[r.ingredientId]=round((result[r.ingredientId]||0)+r.quantity*line.quantity);return result}
+function reserved(s,except){const result={};for(const o of s.orders.filter(o=>o.status==='Confirmado'&&o.id!==except))for(const [k,v] of Object.entries(needs(o)))result[k]=round((result[k]||0)+v);return result}
+function shopping(s,from='',to='9999'){const quantities={};for(const o of s.orders.filter(o=>['Pendiente','Confirmado'].includes(o.status)&&o.date>=from&&o.date<=to))for(const [k,v] of Object.entries(needs(o)))quantities[k]=round((quantities[k]||0)+v);const outside={};for(const o of s.orders.filter(o=>o.status==='Confirmado'&&(o.date<from||o.date>to)))for(const [k,v] of Object.entries(needs(o)))outside[k]=(outside[k]||0)+v;return s.ingredients.filter(i=>quantities[i.id]).map(i=>({...i,required:quantities[i.id],available:round(Math.max(0,i.stock-(outside[i.id]||0))),buy:round(Math.max(0,quantities[i.id]-Math.max(0,i.stock-(outside[i.id]||0))))}))}
+function mutate(original,action,payload,role='owner'){
+ const s=structuredClone(original),p=payload||{};
+ if(role!=='owner'&&!['order','status'].includes(action))fail('Requiere permisos de dueÃ±o.');
+ if(action==='product'){
+  const name=text(p.name,'El nombre');if(s.products.some(x=>x.name.toLocaleLowerCase()===name.toLocaleLowerCase()&&x.id!==p.id))fail('Ya existe un producto con ese nombre.');
+  if(!['Viandas','Postres','Eventos','Otros'].includes(p.category))fail('CategorÃ­a invÃ¡lida.');
+  const record={id:p.id||id(),name,category:text(p.category,'La categorÃ­a'),price:num(p.price,'El precio'),description:String(p.description||'').slice(0,500)};
+  const old=s.products.find(x=>x.id===p.id);if(p.id&&!old)fail('Producto inexistente.');if(old)Object.assign(old,record);else s.products.push({...record,recipe:[]});
+ } else if(action==='ingredient'){
+  const name=text(p.name,'El nombre');if(s.ingredients.some(x=>x.name.toLowerCase()===name.toLowerCase()))fail('El insumo ya existe.');
+  if(!['kg','L','unidad'].includes(p.unit))fail('Unidad invÃ¡lida.');s.ingredients.push({id:id(),name,unit:p.unit,stock:num(p.stock,'El stock'),minimum:num(p.minimum,'El mÃ­nimo'),cost:num(p.cost,'El costo unitario')});
+ } else if(action==='stock'){
+  const i=s.ingredients.find(x=>x.id===p.id);if(!i)fail('Insumo inexistente.');const q=num(p.quantity,'La cantidad',0.000001);const delta=p.kind==='entrada'?q:p.kind==='salida'?-q:fail('Movimiento invÃ¡lido.');if(i.stock+delta<(reserved(s)[i.id]||0))fail('No puedes retirar stock reservado para pedidos.');i.stock=round(i.stock+delta);s.movements.push({id:id(),date:new Date().toISOString(),ingredient:i.name,quantity:delta,unit:i.unit,note:text(p.note,'El motivo')});
+ } else if(action==='recipe'){
+  const product=s.products.find(x=>x.id===p.id);if(!product)fail('Producto inexistente.');if(!Array.isArray(p.recipe))fail('Receta invÃ¡lida.');const seen=new Set();product.recipe=p.recipe.map(r=>{if(!s.ingredients.some(i=>i.id===r.ingredientId))fail('Primero debes registrar el insumo.');if(seen.has(r.ingredientId))fail('No repitas un ingrediente.');seen.add(r.ingredientId);return {ingredientId:r.ingredientId,quantity:num(r.quantity,'La cantidad',0.000001)}});
+ } else if(action==='order'){
+  const customer=text(p.customer,'El cliente');if(!/^\d{4}-\d{2}-\d{2}$/.test(p.date)||Number.isNaN(Date.parse(p.date))||new Date(p.date).toISOString().slice(0,10)!==p.date)fail('La fecha no es vÃ¡lida.');if(!['WhatsApp','Instagram','Directo'].includes(p.channel))fail('Canal invÃ¡lido.');if(!Array.isArray(p.items)||!p.items.length)fail('Agrega al menos un producto.');
+  const items=p.items.map(l=>{const x=s.products.find(x=>x.id===l.productId);if(!x||!x.recipe.length)fail('Cada producto debe tener una receta definida.');const quantity=num(l.quantity,'La cantidad',1);if(!Number.isInteger(quantity))fail('La cantidad de productos debe ser entera.');return {productId:x.id,name:x.name,price:x.price,quantity,recipe:structuredClone(x.recipe)}});
+  s.orders.push({id:id(),number:s.orders.length+1,customer,date:p.date,channel:p.channel,notes:String(p.notes||'').slice(0,500),items,status:'Pendiente',created:new Date().toISOString()});
+ } else if(action==='status'){
+  const o=s.orders.find(x=>x.id===p.id);if(!o)fail('Pedido inexistente.');const allowed={Pendiente:['Confirmado','Cancelado'],Confirmado:['Entregado','Cancelado']};if(!allowed[o.status]?.includes(p.status))fail('Cambio de estado no permitido.');
+  if(p.status==='Confirmado'){const r=reserved(s,o.id);for(const [k,v] of Object.entries(needs(o))){const i=s.ingredients.find(i=>i.id===k);if(!i||round(i.stock-(r[k]||0))<v)fail('Stock insuficiente: '+(i?.name||'insumo')+'. Revisa la lista de compras.')}}
+  if(p.status==='Entregado')for(const [k,v] of Object.entries(needs(o))){const i=s.ingredients.find(i=>i.id===k);if(!i||i.stock<v)fail('Stock insuficiente.');i.stock=round(i.stock-v);s.movements.push({id:id(),date:new Date().toISOString(),ingredient:i.name,quantity:-v,unit:i.unit,note:'Entrega de pedido #'+o.number})}o.status=p.status;
+ } else if(action==='demo'){
+  if(s.products.length||s.ingredients.length||s.orders.length)fail('Los ejemplos solo se cargan en una base vacÃ­a.');
+  s.ingredients=[{id:'harina',name:'Harina de trigo',unit:'kg',stock:12,minimum:3,cost:5.5},{id:'chocolate',name:'Chocolate bitter',unit:'kg',stock:2,minimum:1,cost:32},{id:'azucar',name:'AzÃºcar rubia',unit:'kg',stock:8,minimum:2,cost:4.5},{id:'huevo',name:'Huevos',unit:'unidad',stock:48,minimum:12,cost:0.6},{id:'pollo',name:'Pechuga de pollo',unit:'kg',stock:5,minimum:2,cost:18},{id:'arroz',name:'Arroz',unit:'kg',stock:10,minimum:3,cost:4.8}];
+  s.products=[{id:'torta',name:'Torta de chocolate',category:'Postres',price:65,description:'Torta casera, presentaciÃ³n de 8 porciones.',recipe:[{ingredientId:'harina',quantity:0.4},{ingredientId:'chocolate',quantity:0.5},{ingredientId:'azucar',quantity:0.3},{ingredientId:'huevo',quantity:4}]},{id:'vianda',name:'Pollo con arroz',category:'Viandas',price:16,description:'Una porciÃ³n individual para el almuerzo.',recipe:[{ingredientId:'pollo',quantity:0.2},{ingredientId:'arroz',quantity:0.15}]}];
+ } else fail('AcciÃ³n desconocida.');return s;
+}
+
+=== ARCHIVO: legacy\style.css
+:root{--ink:#253e36;--muted:#7b827c;--green:#244b3e;--line:#e6e9e2;--bg:#f6f7f2;--orange:#eebd77}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14px}button,input,select,textarea{font:inherit}button,a,input,select,textarea{outline-offset:4px}button{cursor:pointer;border:1px solid var(--line);background:white;color:var(--ink);border-radius:8px;padding:10px 15px;font-weight:600}button:hover{filter:brightness(.97)}button:disabled{opacity:.45;cursor:not-allowed}a{color:inherit}h1,h2,h3,p{margin-top:0}h1,h2,h3{font-family:Manrope,sans-serif}h1{font-size:30px;letter-spacing:-1px;margin-bottom:9px}h2{font-size:18px}h3{font-size:16px}.layout{display:grid;grid-template-columns:235px 1fr;min-height:100vh}.sidebar{background:#fff;border-right:1px solid var(--line);padding:30px 20px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}.brand{display:flex;align-items:center;gap:11px;padding:0 5px 35px}.brand-mark{background:var(--green);color:#e8cfa1;display:grid;place-items:center;width:43px;height:43px;border-radius:14px;font-size:25px}.brand strong{display:block;font-family:Georgia,serif;font-size:22px;line-height:1.1}.brand small{font-size:9px;letter-spacing:3px;font-weight:700}.nav-label,.eyebrow{font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted)}.nav-label{padding:12px}.nav{display:grid;gap:7px}.nav button{border:0;text-align:left;display:flex;gap:13px;align-items:center;padding:13px;background:transparent;font-weight:500;color:#717a73}.nav button.active{background:#eaf0e7;color:#234d3b;font-weight:700}.icon{width:19px;height:19px;display:inline-block;flex-shrink:0}.side-bottom{margin-top:auto;padding:20px 5px 0;color:var(--muted);font-size:12px}.side-card{background:#f5f4eb;padding:18px;border-radius:12px;margin-bottom:22px;line-height:1.6}.side-card strong{display:block;color:var(--green)}.workspace{min-width:0}.topbar{height:80px;background:#ffffffb3;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 38px;gap:15px}.topbar .user{display:flex;align-items:center;gap:10px;font-size:12px}.avatar{background:#e8ecdf;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;font-weight:700}.topbar small{display:block;color:var(--muted)}main{padding:34px 38px;max-width:1550px;margin:auto}.page-head{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:27px}.muted{color:var(--muted);line-height:1.6}.primary{background:var(--green);color:white;border-color:var(--green)}.secondary{background:#edf2e9;border-color:#dce7d7}.danger{color:#a84135}.hero{position:relative;overflow:hidden;background:#eaf0e2;border:1px solid #dfe7d6;padding:28px 32px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:26px}.hero h2{font-family:Georgia,serif;font-size:29px;font-weight:400;line-height:1.2;margin:10px 0}.hero p{max-width:440px;margin-bottom:0;color:#677660;line-height:1.7}.hero-art{width:200px;height:120px;flex-shrink:0}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:17px;margin-bottom:28px}.stat{background:white;border:1px solid var(--line);border-radius:12px;padding:21px}.stat-top{display:flex;justify-content:space-between;align-items:center;color:#727b70;font-size:12px}.stat strong{display:block;font-family:Manrope,sans-serif;font-size:30px;letter-spacing:-1px;margin:14px 0 5px}.stat small{color:var(--muted);font-size:11px}.stat-icon{padding:8px;background:#f0f3eb;border-radius:9px;display:flex}.columns{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(270px,1fr);gap:22px}.panel{background:white;border:1px solid var(--line);border-radius:13px;padding:23px;margin-bottom:22px}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.panel-head h2{margin:0}.link-button{border:0;color:#5c7554;background:transparent;padding:0;font-size:12px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap}th{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#889084;font-weight:600;background:#fafbf8}td,th{padding:14px 12px;border-bottom:1px solid #eff1eb}td{font-size:12px}tr:last-child td{border-bottom:0}.badge{display:inline-block;border-radius:5px;padding:5px 8px;font-size:10px;font-weight:700;background:#edf0e9;color:#68775c}.badge.Pendiente,.badge.warn{background:#fff0d8;color:#a77c31}.badge.Confirmado{background:#e9f0e1;color:#597d43}.badge.Entregado{background:#e1efed;color:#337568}.badge.Cancelado{background:#f9e9e4;color:#9e5a4c}.empty{padding:38px 20px;text-align:center;color:#879080;line-height:1.7}.empty strong{display:block;color:#52644b;margin-bottom:7px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:22px}.search{max-width:400px;flex:1;min-width:180px}input,select,textarea{border:1px solid #dce2d7;border-radius:7px;padding:11px 12px;background:#fff;color:var(--ink);width:100%}textarea{min-height:70px;resize:vertical}.toolbar select{width:auto}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:19px}.product{background:white;border:1px solid var(--line);border-radius:13px;overflow:hidden}.product-art{height:120px;background:#f0e9df;display:flex;align-items:center;justify-content:center;font-size:50px;position:relative}.product-art.Viandas{background:#e8eddc}.product-art.Eventos{background:#ece6ed}.product-art .badge{position:absolute;left:15px;top:14px;background:#ffffffc9}.product-body{padding:21px}.product-body h3{margin-bottom:7px}.product-body p{font-size:12px;min-height:37px}.product-bottom{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:16px}.price{font-size:19px;font-weight:700}.product-actions{display:flex;gap:7px;margin-top:17px}.product-actions button{flex:1;font-size:12px}.row{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.row small{display:block;color:var(--muted);margin-top:5px}.dot{width:9px;height:9px;background:#d9a256;border-radius:50%;display:inline-block;margin-right:8px}.footnote{color:#858d7c;font-size:11px;line-height:1.7;margin:20px 0}.progress{height:5px;border-radius:8px;background:#edf0e7;margin-top:10px}.progress span{display:block;height:100%;background:#d7a75d;border-radius:8px}.calendar{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:10px;min-width:900px}.day{border:1px solid var(--line);border-radius:9px;background:#fff;padding:14px;min-height:220px}.day-title{font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:18px}.day-title strong{display:block;font-size:24px;color:var(--ink);margin-top:8px}.event{background:#edf2e6;padding:10px;border-radius:7px;font-size:11px;line-height:1.5;margin-bottom:8px}.event strong{display:block}dialog{border:1px solid var(--line);border-radius:17px;padding:27px;width:min(650px,94vw);max-height:90vh;color:var(--ink);box-shadow:0 30px 100px #16372233}dialog::backdrop{background:#102c246b;backdrop-filter:blur(3px)}.modal-title{display:flex;align-items:center;justify-content:space-between;gap:15px}.modal-title button{border:0;padding:5px;font-size:22px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.form-grid label{font-size:12px;font-weight:600;display:grid;gap:7px}.full{grid-column:1/-1}.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:25px}.line-item{display:grid;grid-template-columns:1fr 100px 32px;gap:9px;margin:10px 0}.line-item button{padding:4px}.notice{background:#f4f5e9;border-radius:8px;padding:12px;line-height:1.6;font-size:12px;margin:14px 0}.error{color:#b34436;font-size:13px;margin-top:15px}.login{min-height:100vh;display:grid;grid-template-columns:1fr 1fr}.login-art{background:#244b3e;color:#f4f0df;padding:70px;display:flex;flex-direction:column;justify-content:center}.login-art h1{font-family:Georgia,serif;font-size:55px;font-weight:400;line-height:1.2;margin:35px 0}.login-art p{color:#c1d0bf;line-height:1.8}.login-form{display:grid;place-items:center;padding:35px}.login-form form{max-width:340px;width:100%}.login-form label{display:block;margin:20px 0}.login-form input{margin-top:8px}.login-form .primary{width:100%}#toast{position:fixed;bottom:26px;right:26px;background:var(--green);color:white;border-radius:10px;padding:15px 22px;box-shadow:0 5px 25px #15312233;display:none;z-index:20;max-width:90vw}.loading{padding:80px;text-align:center}.code{font-family:monospace}.tiny{font-size:11px}@media(min-width:1500px){main{padding:45px 55px}}@media(max-width:1100px){.layout{grid-template-columns:200px 1fr}.sidebar{padding:25px 13px}main{padding:28px 23px}.topbar{padding:0 23px}.grid{grid-template-columns:repeat(2,1fr)}.columns{grid-template-columns:1fr}.hero-art{width:145px}.stats{gap:10px}.stat{padding:15px}}@media(max-width:750px){.layout{display:block}.sidebar{position:static;height:auto;padding:14px}.brand{padding:0 0 15px}.brand strong{font-size:20px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap;padding:10px}.nav-label,.side-bottom{display:none}.topbar{height:60px;padding:0 17px}.topbar>span{display:none}main{padding:23px 16px}.page-head{align-items:flex-start}h1{font-size:25px}.hero{padding:22px}.hero-art{display:none}.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.panel{padding:17px}.form-grid{grid-template-columns:1fr}.login{grid-template-columns:1fr}.login-art{display:none}.line-item{grid-template-columns:1fr 80px 30px}.topbar .user{max-width:75%;overflow:hidden}.page-head .primary{white-space:nowrap;font-size:12px}.stat strong{font-size:26px}}@media print{.sidebar,.topbar,.toolbar,button,.hero,dialog{display:none!important}.layout{display:block}main{padding:0}.panel{border:0}}
+
+@media print{.page-head,.stats,.footnote,.side-bottom{display:none!important}body{background:white;color:#111}.panel{margin:0;padding:0;break-inside:avoid}table{white-space:normal}th,td{font-size:12px}tr{break-inside:avoid}}
+
