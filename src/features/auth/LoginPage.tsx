@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react'
 import { HeroArt } from '@/components/icons/HeroArt'
 import { Eyebrow } from '@/components/layout'
 import { LoginForm } from './components/LoginForm'
+import { RegisterForm } from './components/RegisterForm'
 
-export function LoginPage() {
+/** Layout de las pantallas públicas (login y registro). */
+export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-screen md:grid-cols-2">
       <section className="hidden flex-col justify-center bg-brand p-[70px] text-[#f4f0df] md:flex">
@@ -19,9 +22,19 @@ export function LoginPage() {
         </p>
         <HeroArt className="h-[120px] w-[200px] shrink-0" />
       </section>
-      <section className="grid place-items-center p-[35px]">
-        <LoginForm />
-      </section>
+      <section className="grid place-items-center p-[35px]">{children}</section>
     </div>
   )
 }
+
+export const LoginPage = () => (
+  <AuthLayout>
+    <LoginForm />
+  </AuthLayout>
+)
+
+export const RegisterPage = () => (
+  <AuthLayout>
+    <RegisterForm />
+  </AuthLayout>
+)

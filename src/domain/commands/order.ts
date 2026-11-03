@@ -12,7 +12,7 @@ import {
 import type { CommandHandler } from './types'
 
 export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
-  const customer = requireText(p.customer, 'El cliente')
+  const customer = requireText(p.customer, 'El cliente', 3)
   if (!isValidIsoDate(p.date)) fail('La fecha no es válida.')
   const channel = requireOneOf(p.channel, ORDER_CHANNELS, 'Canal inválido.')
   if (!Array.isArray(p.items) || !p.items.length) fail('Agrega al menos un producto.')

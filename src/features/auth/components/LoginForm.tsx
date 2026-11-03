@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ROUTES } from '@/app/navigation'
 import { Brand } from '@/components/layout'
 import { Button, FormError, Input } from '@/components/ui'
@@ -57,6 +57,12 @@ export function LoginForm() {
         Iniciar sesión →
       </Button>
       <FormError message={error} />
+      <p className="mt-5 text-center text-[13px] text-muted">
+        ¿No tienes cuenta?{' '}
+        <Link to={ROUTES.register} className="font-semibold text-brand underline">
+          Regístrate
+        </Link>
+      </p>
     </form>
   )
 }

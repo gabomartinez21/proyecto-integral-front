@@ -11,19 +11,28 @@ export function AppLayout() {
   const loadError = useKitchenStore((s) => s.loadError)
   const load = useKitchenStore((s) => s.load)
 
+  const refresh = useKitchenStore((s) => s.refresh)
+
   useEffect(() => {
     if (status === 'idle') void load()
   }, [status, load])
 
+  // Al volver a la pestaña se traen los cambios hechos por otros usuarios.
+  useEffect(() => {
+    if (status !== 'ready') return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [status, refresh])
+
   if (status === 'error')
     return (
       <div className="p-20 text-center">
-        <h2>No se pudieron leer los datos locales</h2>
+        <h2>No se pudieron cargar los datos</h2>
         <p>{loadError}</p>
-        <p>
-          Habilita el almacenamiento del navegador. Conserva una copia de tus datos antes de borrar
-          el almacenamiento.
-        </p>
+        <p>Verifica que el servidor esté activo e inténtalo de nuevo.</p>
         <Button onClick={() => void load()}>Reintentar</Button>
       </div>
     )

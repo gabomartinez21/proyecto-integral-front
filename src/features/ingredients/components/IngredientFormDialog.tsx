@@ -44,7 +44,7 @@ export function IngredientFormDialog({ onClose }: { onClose: () => void }) {
             <Input type="number" required min={0} step={0.001} {...register('minimum')} />
           </Field>
           <Field label="Costo por unidad (S/) *">
-            <Input type="number" required min={0} step={0.01} {...register('cost')} />
+            <Input type="number" required min={0.01} step={0.01} {...register('cost')} />
           </Field>
         </FormGrid>
         <Notice>Usa la misma unidad al definir recetas. Ejemplo: 500 g = 0.5 kg.</Notice>
