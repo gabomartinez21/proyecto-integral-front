@@ -57,18 +57,19 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
 
     set({ busy: true })
     try {
-      
+      const cmd = command as any;
+
       // >>> CONEXIÓN AL BACKEND <<<
-      if (command.type === 'ingredient/create') {
-        await apiInsumosService.createInsumo(command.payload);
-      } else if (command.type === 'stock/move') {
-        const payload = command.payload as any;
-        await apiInsumosService.updateStock(payload.id, payload);
-      } else if (command.type === 'order/create') {
-        await apiPedidosService.createPedido(command.payload);
-      } else if (command.type === 'order/changeStatus') {
-        const payload = command.payload as any;
-        await apiPedidosService.updateEstado(payload.id, payload.status);
+      if (cmd.type === 'ingredient/create') {
+        await apiInsumosService.createInsumo(cmd.payload);
+      } else if (cmd.type === 'stock/move') {
+        await apiInsumosService.updateStock(cmd.payload.id, cmd.payload);
+      } else if (cmd.type === 'order/create') {
+        await apiPedidosService.createPedido(cmd.payload);
+      } else if (cmd.type === 'order/update' || cmd.type === 'order/edit') {
+        await apiPedidosService.updatePedido(cmd.payload.id, cmd.payload);
+      } else if (cmd.type === 'order/changeStatus') {
+        await apiPedidosService.updateEstado(cmd.payload.id, cmd.payload.status);
       }
 
       const saved = await kitchenRepository.read()
@@ -87,7 +88,7 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
       next.data.orders = get().data.orders;
       await kitchenRepository.write(next)
       
-      get().load(); 
+      await get().load(); 
 
     } finally {
       set({ busy: false })
