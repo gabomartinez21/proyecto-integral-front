@@ -12,7 +12,7 @@ import {
   Select,
   Textarea,
 } from '@/components/ui'
-import { LIMITS, ORDER_CHANNELS, type OrderInput } from '@/domain'
+import { LIMITS, ORDER_CHANNELS, type Order, type OrderInput } from '@/domain'
 import { useCommand } from '@/hooks/useCommand'
 import { todayIso } from '@/lib/dates'
 import { formatMoney } from '@/lib/format'
@@ -20,35 +20,47 @@ import { useKitchenData } from '@/stores/kitchen.store'
 
 interface OrderFormDialogProps {
   open: boolean
+  orderToEdit?: Order
   onClose: () => void
 }
 
-export function OrderFormDialog({ open, onClose }: OrderFormDialogProps) {
+export function OrderFormDialog({ open, orderToEdit, onClose }: OrderFormDialogProps) {
   return (
-    <Modal open={open} title="Nuevo pedido" onClose={onClose}>
-      {open && <OrderForm onDone={onClose} />}
+    <Modal open={open} title={orderToEdit ? 'Editar pedido' : 'Nuevo pedido'} onClose={onClose}>
+      {open && <OrderForm orderToEdit={orderToEdit} onDone={onClose} />}
     </Modal>
   )
 }
 
-function OrderForm({ onDone }: { onDone: () => void }) {
+function OrderForm({ orderToEdit, onDone }: { orderToEdit?: Order; onDone: () => void }) {
   const { products } = useKitchenData()
   const orderable = useMemo(() => products.filter((p) => p.recipe.length), [products])
   const { run, error, pending } = useCommand()
 
   const { register, control, handleSubmit } = useForm<OrderInput>({
-    defaultValues: {
-      customer: '',
-      date: todayIso(),
-      channel: ORDER_CHANNELS[0],
-      notes: '',
-      items: [{ productId: orderable[0]?.id ?? '', quantity: 1 }],
-    },
+    defaultValues: orderToEdit
+      ? {
+          customer: orderToEdit.customer,
+          date: orderToEdit.date,
+          channel: orderToEdit.channel,
+          notes: orderToEdit.notes,
+          items: orderToEdit.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        }
+      : {
+          customer: '',
+          date: todayIso(),
+          channel: ORDER_CHANNELS[0],
+          notes: '',
+          items: [{ productId: orderable[0]?.id ?? '', quantity: 1 }],
+        },
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
   const onSubmit = handleSubmit(async (values) => {
-    if (await run({ type: 'order/create', payload: values })) onDone()
+    const command = orderToEdit
+      ? ({ type: 'order/edit', payload: { ...values, id: orderToEdit.id } } as any)
+      : ({ type: 'order/create', payload: values } as const)
+    if (await run(command, orderToEdit ? 'Pedido actualizado' : 'Pedido registrado')) onDone()
   })
 
   return (
@@ -110,7 +122,7 @@ function OrderForm({ onDone }: { onDone: () => void }) {
       <FormActions>
         <Button onClick={onDone}>Cancelar</Button>
         <Button type="submit" variant="primary" disabled={pending}>
-          Registrar pedido
+          {orderToEdit ? 'Guardar cambios' : 'Registrar pedido'}
         </Button>
       </FormActions>
     </form>
