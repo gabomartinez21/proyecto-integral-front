@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Button,
   FormActions,
@@ -17,6 +18,7 @@ import {
 import { useCommand } from '@/hooks/useCommand'
 import { formatMoney, formatShortDate } from '@/lib/format'
 import { useKitchenData } from '@/stores/kitchen.store'
+import { OrderFormDialog } from './OrderFormDialog'
 
 interface OrderDetailDialogProps {
   orderId: string | null
@@ -38,11 +40,18 @@ export function OrderDetailDialog({ orderId, onClose }: OrderDetailDialogProps) 
 
 function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) {
   const { run, error, pending } = useCommand()
+  const [editing, setEditing] = useState(false)
+
   const next = nextOrderStatus(order)
 
+  // Al confirmar, el dominio (y luego el backend) verifica el stock y lista los insumos faltantes.
   const changeStatus = async (status: OrderStatus) => {
     if (status === 'Cancelado' && !confirm('¿Cancelar este pedido y liberar sus reservas?')) return
     if (await run({ type: 'order/changeStatus', payload: { id: order.id, status } })) onClose()
+  }
+
+  if (editing) {
+    return <OrderFormDialog open orderToEdit={order} onClose={() => setEditing(false)} />
   }
 
   return (
@@ -64,8 +73,12 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
       ))}
       <ListRow title="Total" aside={<strong>{formatMoney(orderTotal(order))}</strong>} />
       {order.notes && <Notice>{order.notes}</Notice>}
+
       <FormError message={error} />
       <FormActions>
+        {order.status === 'Pendiente' && (
+          <Button onClick={() => setEditing(true)}>Editar pedido</Button>
+        )}
         {next ? (
           <>
             <Button variant="danger" disabled={pending} onClick={() => changeStatus('Cancelado')}>

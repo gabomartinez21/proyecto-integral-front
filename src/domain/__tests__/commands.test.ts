@@ -75,7 +75,47 @@ describe('applyCommand', () => {
     const id = state.orders[0]!.id
     expect(() =>
       applyCommand(state, { type: 'order/changeStatus', payload: { id, status: 'Confirmado' } }),
-    ).toThrow(/Stock insuficiente: Chocolate bitter/)
+    ).toThrow(/Stock insuficiente: Chocolate bitter \(faltan 0\.5 kg\)/)
+  })
+
+  it('permite a un empleado editar un pedido pendiente', () => {
+    const state = withOrder(withDemo())
+    const order = state.orders[0]!
+    const next = applyCommand(
+      state,
+      {
+        type: 'order/edit',
+        payload: {
+          id: order.id,
+          customer: 'Ana María',
+          date: order.date,
+          channel: 'Instagram',
+          items: [{ productId: 'torta', quantity: 3 }],
+        },
+      },
+      'employee',
+    )
+    expect(next.orders[0]).toMatchObject({
+      id: order.id,
+      number: 1,
+      status: 'Pendiente',
+      customer: 'Ana María',
+      channel: 'Instagram',
+      created: order.created,
+    })
+    expect(next.orders[0]?.items[0]?.quantity).toBe(3)
+  })
+
+  it('no edita pedidos que ya no están pendientes', () => {
+    let state = withOrder(withDemo())
+    const order = state.orders[0]!
+    state = applyCommand(state, {
+      type: 'order/changeStatus',
+      payload: { id: order.id, status: 'Confirmado' },
+    })
+    expect(() =>
+      applyCommand(state, { type: 'order/edit', payload: { ...order, notes: 'Cambio' } }),
+    ).toThrow('Solo se pueden editar pedidos pendientes.')
   })
 
   it('no permite transiciones inválidas', () => {

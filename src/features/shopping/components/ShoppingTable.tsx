@@ -1,8 +1,14 @@
-import { Badge, EmptyState, Table, Td, Th, Tr } from '@/components/ui'
+import { Badge, Button, EmptyState, Table, Td, Th, Tr } from '@/components/ui'
 import type { ShoppingItem } from '@/domain'
 import { formatMoney, formatQuantity } from '@/lib/format'
 
-export function ShoppingTable({ items }: { items: ShoppingItem[] }) {
+interface ShoppingTableProps {
+  items: ShoppingItem[]
+  /** Si se pasa, muestra la columna para registrar la compra de cada insumo. */
+  onBuy?: (item: ShoppingItem) => void
+}
+
+export function ShoppingTable({ items, onBuy }: ShoppingTableProps) {
   return (
     <>
       <Table>
@@ -13,6 +19,7 @@ export function ShoppingTable({ items }: { items: ShoppingItem[] }) {
             <Th>Disponible</Th>
             <Th>Comprar</Th>
             <Th>Estimado</Th>
+            {onBuy && <Th>Ingreso</Th>}
           </tr>
         </thead>
         <tbody>
@@ -28,11 +35,22 @@ export function ShoppingTable({ items }: { items: ShoppingItem[] }) {
                 {formatQuantity(i.available)} {i.unit}
               </Td>
               <Td>
-                <Badge tone={i.buy ? 'warn' : 'neutral'}>
-                  {formatQuantity(i.buy)} {i.unit}
+                <Badge tone={i.buy ? 'warn' : 'success'}>
+                  {i.buy ? `${formatQuantity(i.buy)} ${i.unit}` : 'Cubierto'}
                 </Badge>
               </Td>
               <Td>{formatMoney(i.buy * i.cost)}</Td>
+              {onBuy && (
+                <Td>
+                  {i.buy > 0 ? (
+                    <Button variant="link" onClick={() => onBuy(i)}>
+                      ✓ Marcar comprado
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted">Stock suficiente</span>
+                  )}
+                </Td>
+              )}
             </Tr>
           ))}
         </tbody>

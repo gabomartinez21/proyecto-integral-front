@@ -6,6 +6,7 @@ import {
   DEMO_PRODUCTS,
   type KitchenCommand,
   type KitchenState,
+  type Order,
 } from '@/domain'
 import { errorMessage } from '@/lib/errors'
 import { kitchenApi } from '@/services/api'
@@ -24,6 +25,14 @@ interface KitchenStore {
   /** Valida un comando con las reglas del dominio y lo ejecuta en el backend. */
   dispatch: (command: KitchenCommand) => Promise<void>
 }
+
+const toOrderFields = (order: Order): kitchenApi.OrderFields => ({
+  customer: order.customer,
+  date: order.date,
+  channel: order.channel,
+  notes: order.notes,
+  items: order.items.map(({ productId, quantity }) => ({ productId, quantity })),
+})
 
 /**
  * Traduce un comando de dominio a llamadas al API. `next` es el resultado de
@@ -64,15 +73,12 @@ async function runCommand(command: KitchenCommand, next: KitchenState) {
       })
       return
     }
-    case 'order/create': {
-      const order = next.orders.at(-1)!
-      await kitchenApi.createOrder({
-        customer: order.customer,
-        date: order.date,
-        channel: order.channel,
-        notes: order.notes,
-        items: order.items.map(({ productId, quantity }) => ({ productId, quantity })),
-      })
+    case 'order/create':
+      await kitchenApi.createOrder(toOrderFields(next.orders.at(-1)!))
+      return
+    case 'order/edit': {
+      const order = next.orders.find((o) => o.id === command.payload.id)!
+      await kitchenApi.updateOrder(order.id, toOrderFields(order))
       return
     }
     case 'order/changeStatus':

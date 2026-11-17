@@ -9,9 +9,11 @@ import {
   requireOneOf,
   requireText,
 } from '../validators'
-import type { CommandHandler } from './types'
+import type { KitchenState } from '../types'
+import type { CommandHandler, OrderInput } from './types'
 
-export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
+/** Valida los datos comunes de un pedido (nuevo o editado) y arma sus líneas. */
+function buildOrderFields(draft: KitchenState, p: OrderInput) {
   const customer = requireText(p.customer, 'El cliente', 3)
   if (!isValidIsoDate(p.date)) fail('La fecha no es válida.')
   const channel = requireOneOf(p.channel, ORDER_CHANNELS, 'Canal inválido.')
@@ -32,17 +34,25 @@ export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
     }
   })
 
+  return { customer, date: p.date, channel, notes: optionalText(p.notes), items }
+}
+
+export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
   draft.orders.push({
     id: createId(),
     number: draft.orders.length + 1,
-    customer,
-    date: p.date,
-    channel,
-    notes: optionalText(p.notes),
-    items,
+    ...buildOrderFields(draft, p),
     status: 'Pendiente',
     created: new Date().toISOString(),
   })
+}
+
+/** Solo los pedidos pendientes se editan: los confirmados ya tienen insumos reservados. */
+export const editOrder: CommandHandler<'order/edit'> = (draft, p) => {
+  const order = draft.orders.find((x) => x.id === p.id)
+  if (!order) fail('Pedido inexistente.')
+  if (order.status !== 'Pendiente') fail('Solo se pueden editar pedidos pendientes.')
+  Object.assign(order, buildOrderFields(draft, p))
 }
 
 export const changeOrderStatus: CommandHandler<'order/changeStatus'> = (draft, p) => {
@@ -53,11 +63,16 @@ export const changeOrderStatus: CommandHandler<'order/changeStatus'> = (draft, p
 
   if (p.status === 'Confirmado') {
     const reserved = reservedQuantities(draft, order.id)
-    for (const [ingredientId, quantity] of Object.entries(needs)) {
+    // Se listan todos los faltantes de una vez para saber exactamente qué comprar.
+    const missing = Object.entries(needs).flatMap(([ingredientId, quantity]) => {
       const ingredient = draft.ingredients.find((i) => i.id === ingredientId)
-      if (!ingredient || round(ingredient.stock - (reserved[ingredientId] ?? 0)) < quantity)
-        fail(`Stock insuficiente: ${ingredient?.name ?? 'insumo'}. Revisa la lista de compras.`)
-    }
+      const available = ingredient ? round(ingredient.stock - (reserved[ingredientId] ?? 0)) : 0
+      if (available >= quantity) return []
+      const unit = ingredient ? ` ${ingredient.unit}` : ''
+      return [`${ingredient?.name ?? 'insumo'} (faltan ${round(quantity - available)}${unit})`]
+    })
+    if (missing.length)
+      fail(`Stock insuficiente: ${missing.join(', ')}. Revisa la lista de compras.`)
   }
 
   if (p.status === 'Entregado') {

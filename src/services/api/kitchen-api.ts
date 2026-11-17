@@ -186,17 +186,18 @@ export interface OrderFields {
   items: { productId: string; quantity: number }[]
 }
 
+const toOrderBody = (input: OrderFields) => ({
+  ...input,
+  items: input.items.map((i) => ({ productId: toNumericId(i.productId), quantity: i.quantity })),
+})
+
 export async function createOrder(input: OrderFields): Promise<void> {
-  await apiRequest('/pedidos', {
-    method: 'POST',
-    body: {
-      ...input,
-      items: input.items.map((i) => ({
-        productId: toNumericId(i.productId),
-        quantity: i.quantity,
-      })),
-    },
-  })
+  await apiRequest('/pedidos', { method: 'POST', body: toOrderBody(input) })
+}
+
+/** El backend solo permite editar pedidos pendientes. */
+export async function updateOrder(orderId: string, input: OrderFields): Promise<void> {
+  await apiRequest(`/pedidos/${toNumericId(orderId)}`, { method: 'PUT', body: toOrderBody(input) })
 }
 
 /** El backend valida la transición, verifica stock al confirmar y lo descuenta al entregar. */
