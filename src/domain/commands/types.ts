@@ -37,6 +37,10 @@ export interface OrderInput {
   items: { productId: string; quantity: NumericInput }[]
 }
 
+export interface OrderEditInput extends OrderInput {
+  id: string
+}
+
 export interface OrderStatusInput {
   id: string
   status: string
@@ -49,6 +53,7 @@ export type KitchenCommand =
   | { type: 'stock/move'; payload: StockMovementInput }
   | { type: 'recipe/save'; payload: RecipeInput }
   | { type: 'order/create'; payload: OrderInput }
+  | { type: 'order/edit'; payload: OrderEditInput }
   | { type: 'order/changeStatus'; payload: OrderStatusInput }
   | { type: 'demo/load'; payload?: undefined }
 
