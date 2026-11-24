@@ -1,9 +1,15 @@
 import { create } from 'zustand'
-import { applyCommand, createInitialState, type KitchenCommand, type KitchenState } from '@/domain'
+import {
+  applyCommand,
+  createInitialState,
+  DEMO_INGREDIENTS,
+  DEMO_PRODUCTS,
+  type KitchenCommand,
+  type KitchenState,
+  type Order,
+} from '@/domain'
 import { errorMessage } from '@/lib/errors'
-import { kitchenRepository } from '@/services/storage'
-import { apiInsumosService } from '@/services/storage/api-insumos'
-import { apiPedidosService } from '@/services/storage/api-pedidos'
+import { kitchenApi } from '@/services/api'
 import { useAuthStore } from './auth.store'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -12,74 +18,116 @@ interface KitchenStore {
   status: LoadStatus
   loadError: string | null
   data: KitchenState
-  revision: number
   busy: boolean
   load: () => Promise<void>
+  /** Vuelve a leer todo desde el backend. */
+  refresh: () => Promise<void>
+  /** Valida un comando con las reglas del dominio y lo ejecuta en el backend. */
   dispatch: (command: KitchenCommand) => Promise<void>
+}
+
+const toOrderFields = (order: Order): kitchenApi.OrderFields => ({
+  customer: order.customer,
+  date: order.date,
+  channel: order.channel,
+  notes: order.notes,
+  items: order.items.map(({ productId, quantity }) => ({ productId, quantity })),
+})
+
+/**
+ * Traduce un comando de dominio a llamadas al API. `next` es el resultado de
+ * aplicarlo localmente: de ahí se toman los datos ya validados y normalizados.
+ */
+async function runCommand(command: KitchenCommand, next: KitchenState) {
+  switch (command.type) {
+    case 'product/save': {
+      const product = command.payload.id
+        ? next.products.find((p) => p.id === command.payload.id)!
+        : next.products.at(-1)!
+      await kitchenApi.saveProduct(product, command.payload.id)
+      return
+    }
+    case 'recipe/save': {
+      const product = next.products.find((p) => p.id === command.payload.id)!
+      await kitchenApi.saveRecipe(product.id, product.recipe)
+      return
+    }
+    case 'ingredient/create': {
+      const ingredient = next.ingredients.at(-1)!
+      const created = await kitchenApi.createIngredient(ingredient)
+      // El backend crea el insumo con stock 0: la cantidad inicial se registra como entrada.
+      if (ingredient.stock > 0)
+        await kitchenApi.moveStock(created.id, {
+          kind: 'entrada',
+          quantity: ingredient.stock,
+          note: 'Stock inicial',
+        })
+      return
+    }
+    case 'stock/move': {
+      const movement = next.movements.at(-1)!
+      await kitchenApi.moveStock(command.payload.id, {
+        kind: movement.quantity > 0 ? 'entrada' : 'salida',
+        quantity: Math.abs(movement.quantity),
+        note: movement.note,
+      })
+      return
+    }
+    case 'order/create':
+      await kitchenApi.createOrder(toOrderFields(next.orders.at(-1)!))
+      return
+    case 'order/edit': {
+      const order = next.orders.find((o) => o.id === command.payload.id)!
+      await kitchenApi.updateOrder(order.id, toOrderFields(order))
+      return
+    }
+    case 'order/changeStatus':
+      await kitchenApi.changeOrderStatus(command.payload.id, command.payload.status)
+      return
+    case 'demo/load':
+      await loadDemo()
+      return
+  }
+}
+
+/** Crea en el backend los insumos y productos de ejemplo, con sus recetas. */
+async function loadDemo() {
+  const idMap = new Map<string, string>()
+  for (const ingredient of DEMO_INGREDIENTS) {
+    const created = await kitchenApi.createIngredient(ingredient)
+    idMap.set(ingredient.id, created.id)
+    await kitchenApi.moveStock(created.id, {
+      kind: 'entrada',
+      quantity: ingredient.stock,
+      note: 'Stock inicial',
+    })
+  }
+  for (const product of DEMO_PRODUCTS) {
+    const created = await kitchenApi.saveProduct(product)
+    await kitchenApi.saveRecipe(
+      created.id,
+      product.recipe.map((r) => ({ ...r, ingredientId: idMap.get(r.ingredientId)! })),
+    )
+  }
 }
 
 export const useKitchenStore = create<KitchenStore>()((set, get) => ({
   status: 'idle',
   loadError: null,
   data: createInitialState(),
-  revision: 0,
   busy: false,
 
   load: async () => {
     if (get().status === 'loading') return
     set({ status: 'loading', loadError: null })
     try {
-      const { data, revision } = await kitchenRepository.read()
-      
-      try {
-        const [insumosBD, productosBD, pedidosBD] = await Promise.all([
-          apiInsumosService.fetchInsumos(),
-          apiPedidosService.fetchProductos(),
-          apiPedidosService.fetchPedidos(),
-        ]);
-        
-        data.ingredients = insumosBD.map((i: any) => ({
-          id: String(i.id),
-          name: i.name,
-          unit: i.unit,
-          stock: i.stock,
-          minimum: i.minimum,
-          cost: i.cost,
-        }));
-
-        data.products = productosBD.map((p: any) => ({
-          id: String(p.id),
-          name: p.name,
-          category: p.category,
-          price: p.price,
-          description: p.description,
-          recipe: (p.recipe || []).map((r: any) => ({
-            ingredientId: String(r.ingredientId),
-            quantity: r.quantity,
-          })),
-        }));
-        
-        data.orders = pedidosBD.map((o: any) => ({
-          ...o,
-          id: String(o.id),
-          items: (o.items || []).map((it: any) => ({
-            ...it,
-            productId: String(it.productId),
-            recipe: (it.recipe || []).map((r: any) => ({
-              ingredientId: String(r.ingredientId),
-              quantity: r.quantity,
-            })),
-          })),
-        }));
-      } catch (err) {
-        console.error("No se pudo conectar al Backend local.", err);
-      }
-
-      set({ data, revision, status: 'ready' })
+      set({ data: await kitchenApi.fetchKitchen(), status: 'ready' })
     } catch (error) {
       set({ status: 'error', loadError: errorMessage(error) })
     }
   },
+
+  refresh: async () => set({ data: await kitchenApi.fetchKitchen() }),
 
   dispatch: async (command) => {
     const user = useAuthStore.getState().user
@@ -88,49 +136,17 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
 
     set({ busy: true })
     try {
-      const cmd = command as any;
-
-      if (cmd.type === 'ingredient/create') {
-        const created = await apiInsumosService.createInsumo({
-          name: cmd.payload.name,
-          unit: cmd.payload.unit,
-          minimum: Number(cmd.payload.minimum),
-          cost: Number(cmd.payload.cost),
-        });
-        if (Number(cmd.payload.stock) > 0) {
-          await apiInsumosService.updateStock(String(created.id), {
-            kind: 'entrada',
-            quantity: Number(cmd.payload.stock),
-            note: 'Stock inicial',
-          });
-        }
-      } else if (cmd.type === 'stock/move') {
-        await apiInsumosService.updateStock(cmd.payload.id, {
-          kind: cmd.payload.kind,
-          quantity: Number(cmd.payload.quantity),
-          note: cmd.payload.note,
-        });
-      } else if (cmd.type === 'product/save') {
-        await apiPedidosService.saveProducto(cmd.payload);
-      } else if (cmd.type === 'recipe/save') {
-        await apiPedidosService.saveReceta(cmd.payload.id, cmd.payload.recipe);
-      } else if (cmd.type === 'order/create') {
-        await apiPedidosService.createPedido(cmd.payload);
-      } else if (cmd.type === 'order/update' || cmd.type === 'order/edit') {
-        await apiPedidosService.updatePedido(cmd.payload.id, cmd.payload);
-      } else if (cmd.type === 'order/changeStatus') {
-        await apiPedidosService.updateEstado(cmd.payload.id, cmd.payload.status);
-      } else {
-        const saved = await kitchenRepository.read()
-        const next = {
-          data: applyCommand(saved.data, command, user.role),
-          revision: saved.revision + 1,
-        }
-        await kitchenRepository.write(next)
+      // Las reglas se validan primero en el cliente para dar mensajes inmediatos;
+      // el backend vuelve a validarlas y es quien decide.
+      const next = applyCommand(get().data, command, user.role)
+      try {
+        await runCommand(command, next)
+      } finally {
+        // Aunque falle a mitad de camino, se muestra lo que realmente quedó en el servidor.
+        await get()
+          .refresh()
+          .catch(() => {})
       }
-
-      set({ status: 'idle' })
-      await get().load(); 
     } finally {
       set({ busy: false })
     }
@@ -139,7 +155,8 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
 
 export const useKitchenData = () => useKitchenStore((s) => s.data)
 
+// Al cerrar sesión se descarta el estado en memoria; se vuelve a leer en el próximo ingreso.
 useAuthStore.subscribe((auth, prev) => {
   if (prev.user && !auth.user)
-    useKitchenStore.setState({ status: 'idle', data: createInitialState(), revision: 0 })
+    useKitchenStore.setState({ status: 'idle', data: createInitialState() })
 })

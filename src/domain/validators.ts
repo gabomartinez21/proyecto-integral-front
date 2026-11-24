@@ -4,10 +4,12 @@ import { fail } from './errors'
 /** Valor numérico tal como llega de un formulario. */
 export type NumericInput = string | number
 
-export function requireText(value: unknown, label: string): string {
+export function requireText(value: unknown, label: string, minLength = 1): string {
   if (typeof value !== 'string' || !value.trim() || value.length > LIMITS.text)
     fail(`${label} es obligatorio (máximo ${LIMITS.text} caracteres).`)
-  return value.trim()
+  const text = value.trim()
+  if (text.length < minLength) fail(`${label} debe tener al menos ${minLength} caracteres.`)
+  return text
 }
 
 export function optionalText(value: unknown, max: number = LIMITS.longText): string {

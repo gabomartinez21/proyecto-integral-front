@@ -57,10 +57,13 @@ function OrderForm({ orderToEdit, onDone }: { orderToEdit?: Order; onDone: () =>
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
   const onSubmit = handleSubmit(async (values) => {
-    const command = orderToEdit
-      ? ({ type: 'order/edit', payload: { ...values, id: orderToEdit.id } } as any)
-      : ({ type: 'order/create', payload: values } as const)
-    if (await run(command, orderToEdit ? 'Pedido actualizado' : 'Pedido registrado')) onDone()
+    const ok = orderToEdit
+      ? await run(
+          { type: 'order/edit', payload: { ...values, id: orderToEdit.id } },
+          'Pedido actualizado',
+        )
+      : await run({ type: 'order/create', payload: values }, 'Pedido registrado')
+    if (ok) onDone()
   })
 
   return (

@@ -2,7 +2,7 @@ import { fail } from '../errors'
 import type { KitchenState, Role } from '../types'
 import { loadDemo } from './demo'
 import { createIngredient } from './ingredient'
-import { changeOrderStatus, createOrder } from './order'
+import { changeOrderStatus, createOrder, editOrder } from './order'
 import { saveProduct } from './product'
 import { saveRecipe } from './recipe'
 import { moveStock } from './stock'
@@ -16,12 +16,17 @@ const handlers: { [K in CommandType]: CommandHandler<K> } = {
   'stock/move': moveStock,
   'recipe/save': saveRecipe,
   'order/create': createOrder,
+  'order/edit': editOrder,
   'order/changeStatus': changeOrderStatus,
   'demo/load': loadDemo,
 }
 
 /** Comandos que un empleado puede ejecutar; el resto requiere rol de dueño. */
-const EMPLOYEE_COMMANDS: ReadonlySet<CommandType> = new Set(['order/create', 'order/changeStatus'])
+const EMPLOYEE_COMMANDS: ReadonlySet<CommandType> = new Set([
+  'order/create',
+  'order/edit',
+  'order/changeStatus',
+])
 
 export function canExecute(role: Role, type: CommandType): boolean {
   return role === 'owner' || EMPLOYEE_COMMANDS.has(type)

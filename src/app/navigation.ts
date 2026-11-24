@@ -2,6 +2,7 @@ import type { IconName } from '@/components/icons/Icon'
 
 export const ROUTES = {
   login: '/login',
+  register: '/registro',
   dashboard: '/',
   orders: '/pedidos',
   products: '/productos',

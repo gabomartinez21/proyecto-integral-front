@@ -16,9 +16,7 @@ import {
   type OrderStatus,
 } from '@/domain'
 import { useCommand } from '@/hooks/useCommand'
-import { errorMessage } from '@/lib/errors'
 import { formatMoney, formatShortDate } from '@/lib/format'
-import { apiPedidosService } from '@/services/storage/api-pedidos'
 import { useKitchenData } from '@/stores/kitchen.store'
 import { OrderFormDialog } from './OrderFormDialog'
 
@@ -35,6 +33,7 @@ const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
 export function OrderDetailDialog({ orderId, onClose }: OrderDetailDialogProps) {
   const { orders } = useKitchenData()
   const order = orders.find((o) => o.id === orderId)
+  // Al cerrarse se desmonta el contenido, así el error de un intento previo no reaparece.
   if (!order) return null
   return <OrderDetail order={order} onClose={onClose} />
 }
@@ -42,30 +41,12 @@ export function OrderDetailDialog({ orderId, onClose }: OrderDetailDialogProps) 
 function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) {
   const { run, error, pending } = useCommand()
   const [editing, setEditing] = useState(false)
-  const [stockAlert, setStockAlert] = useState<string | null>(null)
 
   const next = nextOrderStatus(order)
 
+  // Al confirmar, el dominio (y luego el backend) verifica el stock y lista los insumos faltantes.
   const changeStatus = async (status: OrderStatus) => {
-    setStockAlert(null)
     if (status === 'Cancelado' && !confirm('¿Cancelar este pedido y liberar sus reservas?')) return
-
-    // HU015 y HU017: Validar stock en el backend antes de confirmar y mostrar alerta detallada si falta
-    if (status === 'Confirmado') {
-      try {
-        await apiPedidosService.validarStock({
-          customer: order.customer,
-          date: order.date,
-          channel: order.channel,
-          notes: order.notes,
-          items: order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-        })
-      } catch (e) {
-        setStockAlert(errorMessage(e))
-        return
-      }
-    }
-
     if (await run({ type: 'order/changeStatus', payload: { id: order.id, status } })) onClose()
   }
 
@@ -92,16 +73,6 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
       ))}
       <ListRow title="Total" aside={<strong>{formatMoney(orderTotal(order))}</strong>} />
       {order.notes && <Notice>{order.notes}</Notice>}
-
-      {/* HU017: Banner detallado de ingredientes faltantes */}
-      {stockAlert && (
-        <div
-          role="alert"
-          className="mt-4 rounded-lg border border-[#e5b8b0] bg-[#f9e9e4] p-3 text-xs font-semibold text-[#9e5a4c]"
-        >
-          {stockAlert}
-        </div>
-      )}
 
       <FormError message={error} />
       <FormActions>

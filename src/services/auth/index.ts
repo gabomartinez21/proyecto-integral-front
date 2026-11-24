@@ -1,5 +1,5 @@
-import { DemoAuthService } from './demo-auth-service'
+import { ApiAuthService } from './api-auth-service'
 
-export type { AuthService, SessionUser } from './types'
+export type { AuthService, RegisterInput, SessionUser } from './types'
 
-export const authService = new DemoAuthService()
+export const authService = new ApiAuthService()
