@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHeader, WeekToolbar } from '@/components/layout'
 import { Button, Footnote, Panel, PanelHeader, StatCard, StatGrid } from '@/components/ui'
 import { shoppingList, type ShoppingItem } from '@/domain'
 import { addDays } from '@/lib/dates'
+import { errorMessage } from '@/lib/errors'
 import { formatMoney } from '@/lib/format'
 import { useIsOwner } from '@/stores/auth.store'
+import { kitchenApi } from '@/services/api'
 import { useKitchenData } from '@/stores/kitchen.store'
 import { useWeekStore } from '@/stores/week.store'
 import { PurchaseDialog } from './components/PurchaseDialog'
@@ -14,8 +16,35 @@ export function ShoppingPage() {
   const state = useKitchenData()
   const isOwner = useIsOwner()
   const start = useWeekStore((s) => s.start)
-  const items = useMemo(() => shoppingList(state, start, addDays(start, 6)), [state, start])
-  const budget = items.reduce((sum, i) => sum + i.buy * i.cost, 0)
+  const end = addDays(start, 6)
+  // Plan B si el servidor no responde: mismo cálculo (misma regla) hecho en el cliente.
+  const localItems = useMemo(() => shoppingList(state, start, end), [state, start, end])
+  const [remote, setRemote] = useState<kitchenApi.ShoppingListResult | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // La lista la calcula el backend (HU021/HU022); se vuelve a pedir al cambiar la semana
+  // o cuando cambian pedidos e insumos (p. ej. tras registrar una compra).
+  useEffect(() => {
+    let cancelled = false
+    kitchenApi
+      .fetchShoppingList(start, end)
+      .then((result) => {
+        if (cancelled) return
+        setRemote(result)
+        setLoadError(null)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setRemote(null)
+        setLoadError(errorMessage(error))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [start, end, state])
+
+  const items = remote?.items ?? localItems
+  const budget = remote?.budget ?? items.reduce((sum, i) => sum + i.buy * i.cost, 0)
   const [buying, setBuying] = useState<ShoppingItem | null>(null)
 
   return (
@@ -25,6 +54,11 @@ export function ShoppingPage() {
         subtitle="Estos son los ingredientes que necesitas para tus pedidos."
       />
       <WeekToolbar />
+      {loadError && (
+        <p role="alert" className="mb-3 text-[13px] text-error">
+          No se pudo leer la lista del servidor ({loadError}). Se muestra un cálculo local.
+        </p>
+      )}
       <StatGrid>
         <StatCard
           label="Insumos por comprar"

@@ -1,17 +1,26 @@
 export const PRODUCT_CATEGORIES = ['Viandas', 'Postres', 'Eventos', 'Otros'] as const
 export const UNITS = ['kg', 'L', 'unidad'] as const
 export const ORDER_CHANNELS = ['WhatsApp', 'Instagram', 'Directo'] as const
-export const ORDER_STATUSES = ['Pendiente', 'Confirmado', 'Entregado', 'Cancelado'] as const
+export const ORDER_STATUSES = [
+  'Pendiente de pago',
+  'Confirmado',
+  'En preparación',
+  'Listo para entrega',
+  'Entregado',
+  'Cancelado',
+] as const
 export const STOCK_MOVEMENT_KINDS = ['entrada', 'salida'] as const
 export const ROLES = ['owner', 'employee'] as const
 
 /** Estados en los que un pedido sigue "en curso" (por preparar o entregar). */
-export const ACTIVE_ORDER_STATUSES = ['Pendiente', 'Confirmado'] as const
+export const ACTIVE_ORDER_STATUSES = ['Pendiente de pago', 'Confirmado'] as const
 
 /** Máquina de estados de un pedido: desde cada estado, a cuáles se puede pasar. */
 export const ORDER_TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
-  Pendiente: ['Confirmado', 'Cancelado'],
-  Confirmado: ['Entregado', 'Cancelado'],
+  'Pendiente de pago': ['Confirmado', 'Cancelado'],
+  Confirmado: ['En preparación', 'Cancelado'],
+  'En preparación': ['Listo para entrega'],
+  'Listo para entrega': ['Entregado'],
 }
 
 export const LIMITS = {

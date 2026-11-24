@@ -12,9 +12,19 @@ export const isActiveOrder = (order: Order) =>
 
 export const formatOrderNumber = (order: Order) => `#${String(order.number).padStart(3, '0')}`
 
-/** Siguiente estado "positivo" del flujo (confirmar → entregar). */
+/** Siguiente estado del flujo: confirmar → preparar → listo → entregar. */
 export function nextOrderStatus(order: Order) {
-  if (order.status === 'Pendiente') return 'Confirmado' as const
-  if (order.status === 'Confirmado') return 'Entregado' as const
-  return null
+  switch (order.status) {
+    // Con el pago ya validado (pero sin stock) se puede reintentar la confirmación.
+    case 'Pendiente de pago':
+      return order.paymentStatus === 'Validado' ? ('Confirmado' as const) : null
+    case 'Confirmado':
+      return 'En preparación' as const
+    case 'En preparación':
+      return 'Listo para entrega' as const
+    case 'Listo para entrega':
+      return 'Entregado' as const
+    default:
+      return null
+  }
 }

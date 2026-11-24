@@ -61,6 +61,12 @@ export interface Order {
   items: OrderItem[]
   status: OrderStatus
   created: string
+  /** HU024: la dueña valida el pago antes de confirmar. */
+  paymentStatus?: 'Pendiente' | 'Validado'
+  operationCode?: string | null
+  paymentProofUrl?: string | null
+  paymentValidatedBy?: string | null
+  deliveryReceiver?: string | null
 }
 
 export interface StockMovement {

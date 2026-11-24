@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Button, Field, FormActions, FormError, Input, Modal } from '@/components/ui'
 import type { ShoppingItem } from '@/domain'
-import { useCommand } from '@/hooks/useCommand'
+import { errorMessage } from '@/lib/errors'
+import { useKitchenStore } from '@/stores/kitchen.store'
+import { toast } from '@/stores/toast.store'
 
 interface PurchaseDialogProps {
   item: ShoppingItem | null
@@ -19,19 +21,26 @@ export function PurchaseDialog({ item, onClose }: PurchaseDialogProps) {
 }
 
 function PurchaseForm({ item, onDone }: { item: ShoppingItem; onDone: () => void }) {
-  const { run, error, pending } = useCommand()
+  const confirmPurchase = useKitchenStore((s) => s.confirmPurchase)
+  const pending = useKitchenStore((s) => s.busy)
+  const [error, setError] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(String(item.buy))
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const ok = await run(
-      {
-        type: 'stock/move',
-        payload: { id: item.id, kind: 'entrada', quantity, note: 'Compra desde lista semanal' },
-      },
-      `Ingreso registrado: +${quantity} ${item.unit} de ${item.name}`,
-    )
-    if (ok) onDone()
+    const amount = Number(quantity)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('La cantidad adquirida debe ser mayor que cero.')
+      return
+    }
+    setError(null)
+    try {
+      await confirmPurchase(item.id, amount)
+      toast(`Ingreso registrado: +${quantity} ${item.unit} de ${item.name}`)
+      onDone()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
   }
 
   return (

@@ -7,6 +7,7 @@ import type {
   Product,
   ProductCategory,
   RecipeLine,
+  ShoppingItem,
   StockMovement,
   StockMovementKind,
 } from '@/domain'
@@ -60,6 +61,11 @@ const pedidoSchema = z.object({
   notes: z.string(),
   status: z.enum(ORDER_STATUSES),
   created: z.string(),
+  paymentStatus: z.optional(z.enum(['Pendiente', 'Validado'])),
+  operationCode: z.optional(z.nullable(z.string())),
+  paymentProofUrl: z.optional(z.nullable(z.string())),
+  paymentValidatedBy: z.optional(z.nullable(z.string())),
+  deliveryReceiver: z.optional(z.nullable(z.string())),
   items: z.array(
     z.object({
       productId: id,
@@ -201,9 +207,80 @@ export async function updateOrder(orderId: string, input: OrderFields): Promise<
 }
 
 /** El backend valida la transición, verifica stock al confirmar y lo descuenta al entregar. */
-export async function changeOrderStatus(orderId: string, status: string): Promise<void> {
+export async function changeOrderStatus(
+  orderId: string,
+  status: string,
+  receiver?: string,
+): Promise<void> {
   await apiRequest(`/pedidos/${toNumericId(orderId)}/estado`, {
     method: 'PUT',
-    body: { status },
+    body: { status, receiver },
+  })
+}
+
+/** HU024: solo la dueña. Comprobante JPG/PNG (máx. 5 MB) o código de operación. */
+export async function validateOrderPayment(
+  orderId: string,
+  input: { code?: string; proof?: File | null },
+): Promise<void> {
+  const form = new FormData()
+  if (input.code?.trim()) form.append('codigo_operacion', input.code.trim())
+  if (input.proof) form.append('comprobante', input.proof)
+  await apiRequest(`/pedidos/${toNumericId(orderId)}/validar-pago`, { method: 'PATCH', body: form })
+}
+
+// --- Compras (HU021, HU022, HU023) ---
+
+const compraItemSchema = z.object({
+  id: id,
+  name: z.string(),
+  unit: z.enum(UNITS),
+  stock: z.number(),
+  minimum: z.number(),
+  cost: z.number(),
+  required: z.number(),
+  available: z.number(),
+  buy: z.number(),
+  estimatedCost: z.number(),
+})
+
+const listaSemanalSchema = z.object({
+  mensaje: z.string(),
+  presupuesto_estimado: z.number(),
+  items: z.array(compraItemSchema),
+})
+
+export interface ShoppingListResult {
+  items: ShoppingItem[]
+  budget: number
+  message: string
+}
+
+/** HU021/HU022: lista semanal calculada por el backend (demanda − cobertura, sin doble reserva). */
+export async function fetchShoppingList(from: string, to: string): Promise<ShoppingListResult> {
+  const query = new URLSearchParams({ fecha_inicio: from, fecha_fin: to })
+  const data = listaSemanalSchema.parse(await apiRequest(`/compras/lista-semanal?${query}`))
+  return {
+    budget: data.presupuesto_estimado,
+    message: data.mensaje,
+    items: data.items.map((item) => ({
+      id: toId(item.id),
+      name: item.name,
+      unit: item.unit,
+      stock: item.stock,
+      minimum: item.minimum,
+      cost: item.cost,
+      required: item.required,
+      available: item.available,
+      buy: item.buy,
+    })),
+  }
+}
+
+/** HU023: ingreso rápido de un insumo comprado (solo la dueña); suma al almacén de forma atómica. */
+export async function confirmPurchase(ingredientId: string, quantity: number): Promise<void> {
+  await apiRequest('/compras/confirmar-item', {
+    method: 'POST',
+    body: { insumo_id: toNumericId(ingredientId), quantity },
   })
 }

@@ -1,4 +1,3 @@
-import { ACTIVE_ORDER_STATUSES } from './constants'
 import type { Ingredient, KitchenState, Order, QuantityMap, ShoppingItem } from './types'
 import { addQuantity, round } from './utils'
 
@@ -35,17 +34,17 @@ export function lowStockIngredients(state: KitchenState): Ingredient[] {
   return state.ingredients.filter((i) => isLowStock(i, reserved))
 }
 
+/** HU021: cuentan los pedidos confirmados y los que tienen el pago validado pendientes de stock. */
+const needsSupply = (o: Order) =>
+  o.status === 'Confirmado' || (o.status === 'Pendiente de pago' && o.paymentStatus === 'Validado')
+
 /**
  * Lista de compras para los pedidos activos entre `from` y `to` (inclusive).
  * El stock disponible descuenta lo reservado por pedidos confirmados fuera del rango.
  */
 export function shoppingList(state: KitchenState, from = '', to = '9999'): ShoppingItem[] {
   const inRange = (o: Order) => o.date >= from && o.date <= to
-  const required = sumNeeds(
-    state.orders.filter(
-      (o) => (ACTIVE_ORDER_STATUSES as readonly string[]).includes(o.status) && inRange(o),
-    ),
-  )
+  const required = sumNeeds(state.orders.filter((o) => needsSupply(o) && inRange(o)))
   const reservedOutside = sumNeeds(
     state.orders.filter((o) => o.status === 'Confirmado' && !inRange(o)),
   )

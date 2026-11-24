@@ -56,7 +56,10 @@ export function ShoppingTable({ items, onBuy }: ShoppingTableProps) {
         </tbody>
       </Table>
       {!items.length && (
-        <EmptyState>No hay pedidos pendientes ni confirmados en esta semana.</EmptyState>
+        <EmptyState>
+          Stock suficiente para los pedidos de la semana (no hay pedidos confirmados ni con pago
+          validado).
+        </EmptyState>
       )}
     </>
   )

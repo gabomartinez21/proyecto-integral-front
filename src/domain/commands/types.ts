@@ -44,6 +44,8 @@ export interface OrderEditInput extends OrderInput {
 export interface OrderStatusInput {
   id: string
   status: string
+  /** Obligatorio al marcar Entregado: quién recibió el pedido. */
+  receiver?: string
 }
 
 /** Todas las operaciones que modifican el estado de la cocina. */

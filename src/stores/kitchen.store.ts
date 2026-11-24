@@ -24,6 +24,10 @@ interface KitchenStore {
   refresh: () => Promise<void>
   /** Valida un comando con las reglas del dominio y lo ejecuta en el backend. */
   dispatch: (command: KitchenCommand) => Promise<void>
+  /** HU024: la dueña valida el pago; con stock suficiente el pedido se confirma. */
+  validatePayment: (orderId: string, code: string, proof: File | null) => Promise<void>
+  /** HU023: registra la compra de un insumo de la lista semanal. */
+  confirmPurchase: (ingredientId: string, quantity: number) => Promise<void>
 }
 
 const toOrderFields = (order: Order): kitchenApi.OrderFields => ({
@@ -82,7 +86,11 @@ async function runCommand(command: KitchenCommand, next: KitchenState) {
       return
     }
     case 'order/changeStatus':
-      await kitchenApi.changeOrderStatus(command.payload.id, command.payload.status)
+      await kitchenApi.changeOrderStatus(
+        command.payload.id,
+        command.payload.status,
+        command.payload.receiver,
+      )
       return
     case 'demo/load':
       await loadDemo()
@@ -143,6 +151,42 @@ export const useKitchenStore = create<KitchenStore>()((set, get) => ({
         await runCommand(command, next)
       } finally {
         // Aunque falle a mitad de camino, se muestra lo que realmente quedó en el servidor.
+        await get()
+          .refresh()
+          .catch(() => {})
+      }
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  validatePayment: async (orderId, code, proof) => {
+    if (useAuthStore.getState().user?.role !== 'owner')
+      throw new Error('Solo la dueña puede validar pagos.')
+    if (get().busy) throw new Error('Espera a que termine la operación anterior.')
+    set({ busy: true })
+    try {
+      try {
+        await kitchenApi.validateOrderPayment(orderId, { code, proof })
+      } finally {
+        await get()
+          .refresh()
+          .catch(() => {})
+      }
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  confirmPurchase: async (ingredientId, quantity) => {
+    if (useAuthStore.getState().user?.role !== 'owner')
+      throw new Error('Solo la dueña puede registrar compras.')
+    if (get().busy) throw new Error('Espera a que termine la operación anterior.')
+    set({ busy: true })
+    try {
+      try {
+        await kitchenApi.confirmPurchase(ingredientId, quantity)
+      } finally {
         await get()
           .refresh()
           .catch(() => {})

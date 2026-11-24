@@ -16,6 +16,12 @@ function withOrder(state: KitchenState, quantity = 1, date = '2026-10-28') {
   })
 }
 
+/** HU024: la validación de pago la hace el backend; en el dominio solo se refleja en el pedido. */
+const pay = (state: KitchenState, id: string): KitchenState => ({
+  ...state,
+  orders: state.orders.map((o) => (o.id === id ? { ...o, paymentStatus: 'Validado' as const } : o)),
+})
+
 describe('applyCommand', () => {
   it('no muta el estado original', () => {
     const initial = createInitialState()
@@ -48,13 +54,18 @@ describe('applyCommand', () => {
 
   it('crea pedidos pendientes con copia de la receta', () => {
     const state = withOrder(withDemo(), 2)
-    expect(state.orders[0]).toMatchObject({ number: 1, status: 'Pendiente', customer: 'Ana' })
+    expect(state.orders[0]).toMatchObject({
+      number: 1,
+      status: 'Pendiente de pago',
+      customer: 'Ana',
+    })
     expect(state.orders[0]?.items[0]?.recipe).toHaveLength(4)
   })
 
-  it('reserva insumos al confirmar y los descuenta al entregar', () => {
+  it('reserva insumos al confirmar y los descuenta al pasar a preparación', () => {
     let state = withOrder(withDemo())
     const id = state.orders[0]!.id
+    state = pay(state, id)
     state = applyCommand(state, {
       type: 'order/changeStatus',
       payload: { id, status: 'Confirmado' },
@@ -63,7 +74,7 @@ describe('applyCommand', () => {
 
     state = applyCommand(state, {
       type: 'order/changeStatus',
-      payload: { id, status: 'Entregado' },
+      payload: { id, status: 'En preparación' },
     })
     expect(reservedQuantities(state).chocolate).toBeUndefined()
     expect(state.ingredients.find((i) => i.id === 'chocolate')?.stock).toBe(1.5)
@@ -71,8 +82,9 @@ describe('applyCommand', () => {
   })
 
   it('no confirma pedidos sin stock suficiente', () => {
-    const state = withOrder(withDemo(), 5) // 2.5 kg de chocolate, hay 2 kg
+    let state = withOrder(withDemo(), 5) // 2.5 kg de chocolate, hay 2 kg
     const id = state.orders[0]!.id
+    state = pay(state, id)
     expect(() =>
       applyCommand(state, { type: 'order/changeStatus', payload: { id, status: 'Confirmado' } }),
     ).toThrow(/Stock insuficiente: Chocolate bitter \(faltan 0\.5 kg\)/)
@@ -98,7 +110,7 @@ describe('applyCommand', () => {
     expect(next.orders[0]).toMatchObject({
       id: order.id,
       number: 1,
-      status: 'Pendiente',
+      status: 'Pendiente de pago',
       customer: 'Ana María',
       channel: 'Instagram',
       created: order.created,
@@ -109,13 +121,39 @@ describe('applyCommand', () => {
   it('no edita pedidos que ya no están pendientes', () => {
     let state = withOrder(withDemo())
     const order = state.orders[0]!
+    state = pay(state, order.id)
     state = applyCommand(state, {
       type: 'order/changeStatus',
       payload: { id: order.id, status: 'Confirmado' },
     })
     expect(() =>
       applyCommand(state, { type: 'order/edit', payload: { ...order, notes: 'Cambio' } }),
-    ).toThrow('Solo se pueden editar pedidos pendientes.')
+    ).toThrow('Solo se pueden editar pedidos pendientes de pago.')
+  })
+
+  it('no confirma pedidos sin pago validado', () => {
+    const state = withOrder(withDemo())
+    const id = state.orders[0]!.id
+    expect(() =>
+      applyCommand(state, { type: 'order/changeStatus', payload: { id, status: 'Confirmado' } }),
+    ).toThrow('El pago debe ser validado por la dueña antes de confirmar el pedido.')
+  })
+
+  it('recorre el flujo hasta Entregado exigiendo el receptor', () => {
+    let state = withOrder(withDemo())
+    const id = state.orders[0]!.id
+    state = pay(state, id)
+    for (const status of ['Confirmado', 'En preparación', 'Listo para entrega']) {
+      state = applyCommand(state, { type: 'order/changeStatus', payload: { id, status } })
+    }
+    expect(() =>
+      applyCommand(state, { type: 'order/changeStatus', payload: { id, status: 'Entregado' } }),
+    ).toThrow('Indica quién recibió el pedido para marcarlo como entregado.')
+    state = applyCommand(state, {
+      type: 'order/changeStatus',
+      payload: { id, status: 'Entregado', receiver: 'Ana' },
+    })
+    expect(state.orders[0]).toMatchObject({ status: 'Entregado', deliveryReceiver: 'Ana' })
   })
 
   it('no permite transiciones inválidas', () => {
@@ -129,6 +167,7 @@ describe('applyCommand', () => {
   it('no permite retirar stock reservado', () => {
     let state = withOrder(withDemo(), 4) // 2 kg de chocolate
     const id = state.orders[0]!.id
+    state = pay(state, id)
     state = applyCommand(state, {
       type: 'order/changeStatus',
       payload: { id, status: 'Confirmado' },
@@ -144,7 +183,9 @@ describe('applyCommand', () => {
 
 describe('shoppingList', () => {
   it('calcula lo que falta comprar en el rango', () => {
-    const state = withOrder(withDemo(), 5)
+    const ordered = withOrder(withDemo(), 5)
+    // HU021: cuenta con el pago validado aunque el stock no alcance para confirmar.
+    const state = pay(ordered, ordered.orders[0]!.id)
     const chocolate = shoppingList(state, '2026-10-26', '2026-11-01').find(
       (i) => i.id === 'chocolate',
     )

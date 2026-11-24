@@ -42,7 +42,8 @@ export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
     id: createId(),
     number: draft.orders.length + 1,
     ...buildOrderFields(draft, p),
-    status: 'Pendiente',
+    status: 'Pendiente de pago',
+    paymentStatus: 'Pendiente',
     created: new Date().toISOString(),
   })
 }
@@ -51,7 +52,8 @@ export const createOrder: CommandHandler<'order/create'> = (draft, p) => {
 export const editOrder: CommandHandler<'order/edit'> = (draft, p) => {
   const order = draft.orders.find((x) => x.id === p.id)
   if (!order) fail('Pedido inexistente.')
-  if (order.status !== 'Pendiente') fail('Solo se pueden editar pedidos pendientes.')
+  if (order.status !== 'Pendiente de pago')
+    fail('Solo se pueden editar pedidos pendientes de pago.')
   Object.assign(order, buildOrderFields(draft, p))
 }
 
@@ -62,6 +64,8 @@ export const changeOrderStatus: CommandHandler<'order/changeStatus'> = (draft, p
   const needs = orderNeeds(order)
 
   if (p.status === 'Confirmado') {
+    if (order.paymentStatus !== 'Validado')
+      fail('El pago debe ser validado por la dueña antes de confirmar el pedido.')
     const reserved = reservedQuantities(draft, order.id)
     // Se listan todos los faltantes de una vez para saber exactamente qué comprar.
     const missing = Object.entries(needs).flatMap(([ingredientId, quantity]) => {
@@ -76,6 +80,13 @@ export const changeOrderStatus: CommandHandler<'order/changeStatus'> = (draft, p
   }
 
   if (p.status === 'Entregado') {
+    const receiver = (p.receiver ?? '').trim()
+    if (!receiver) fail('Indica quién recibió el pedido para marcarlo como entregado.')
+    order.deliveryReceiver = receiver
+  }
+
+  // El stock se descuenta al pasar a preparación (la reserva se libera sola al dejar Confirmado).
+  if (p.status === 'En preparación') {
     for (const [ingredientId, quantity] of Object.entries(needs)) {
       const ingredient = draft.ingredients.find((i) => i.id === ingredientId)
       if (!ingredient || ingredient.stock < quantity) fail('Stock insuficiente.')
@@ -86,7 +97,7 @@ export const changeOrderStatus: CommandHandler<'order/changeStatus'> = (draft, p
         ingredient: ingredient.name,
         quantity: -quantity,
         unit: ingredient.unit,
-        note: `Entrega de pedido #${order.number}`,
+        note: `Preparación de pedido #${order.number}`,
       })
     }
   }

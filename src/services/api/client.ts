@@ -38,7 +38,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const headers: Record<string, string> = { Accept: 'application/json' }
   let payload: BodyInit | undefined
 
-  if (body instanceof URLSearchParams) {
+  if (body instanceof URLSearchParams || body instanceof FormData) {
     payload = body
   } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
@@ -71,6 +71,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 function detailMessage(data: unknown, status: number): string {
   const detail = (data as { detail?: unknown } | null)?.detail
   if (typeof detail === 'string') return detail
+  const objMessage = (detail as { message?: unknown } | null)?.message
+  if (
+    detail &&
+    typeof detail === 'object' &&
+    !Array.isArray(detail) &&
+    typeof objMessage === 'string'
+  )
+    return objMessage
   if (Array.isArray(detail)) {
     const msgs = detail
       .map((d) => (d as { msg?: unknown })?.msg)
